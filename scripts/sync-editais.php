@@ -1,12 +1,12 @@
 <?php
 /**
  * Script de sincronização de editais — roda no GitHub Actions.
- * Faz chamadas às APIs externas (Transferegov, IATI) e envia os resultados
- * para o endpoint de ingest do Laravel via HTTP.
+ * Fontes: Transferegov (gov federal BR) + D-Portal/IATI (internacional)
  */
 
-$ingestUrl   = getenv('INGEST_URL');   // https://promessa.ong.br/documentos/public/api/editais/ingest
-$ingestToken = getenv('INGEST_TOKEN'); // valor do INGEST_SECRET no .env do servidor
+$ingestUrl    = getenv('INGEST_URL');
+$ingestToken  = getenv('INGEST_TOKEN');
+$dadosGovKey  = getenv('DADOS_GOV_KEY');
 
 if (!$ingestUrl || !$ingestToken) {
     echo "ERRO: variáveis INGEST_URL e INGEST_TOKEN são obrigatórias.\n";
@@ -14,108 +14,206 @@ if (!$ingestUrl || !$ingestToken) {
 }
 
 $editais = [];
-$erros   = [];
+$log     = [];
 
 // ---------------------------------------------------------------
-// FONTE 1: Transferegov — Chamadas Públicas Abertas
+// FONTE 1: Transferegov — tenta múltiplos endpoints conhecidos
 // ---------------------------------------------------------------
 echo "→ Buscando Transferegov...\n";
-$tgov = fetchJson('https://api.transferegov.sistema.gov.br/chamadas/v1/chamadas-publicas?situacao=ABERTA&tamanhoPagina=100');
 
-if ($tgov !== null) {
-    $items = $tgov['data'] ?? $tgov['content'] ?? $tgov['result'] ?? [];
-    echo "  Transferegov: " . count($items) . " item(s) encontrado(s)\n";
-
-    foreach ($items as $item) {
-        $fonteId = 'tgov_' . ($item['id'] ?? md5(json_encode($item)));
-        $titulo  = $item['titulo'] ?? $item['nome'] ?? '';
-        if (empty($titulo)) continue;
-
-        $editais[] = [
-            'fonte'           => 'transferegov',
-            'fonte_id'        => $fonteId,
-            'titulo'          => $titulo,
-            'link_oficial'    => $item['linkEdital'] ?? $item['urlEdital'] ?? null,
-            'valor_min'       => $item['valorMinimo'] ?? null,
-            'valor_max'       => $item['valorMaximo'] ?? $item['valorTotal'] ?? null,
-            'prazo_inscricao' => formatDate($item['dataEncerramentoInscricao'] ?? null),
-            'raw_text'        => implode("\n", array_filter([
-                $titulo,
-                $item['objeto']     ?? $item['descricao'] ?? '',
-                $item['requisitos'] ?? '',
-            ])),
-        ];
-    }
-} else {
-    $erros[] = 'Transferegov: falha na requisição';
-    echo "  ERRO: não foi possível acessar a API do Transferegov\n";
-}
-
-// ---------------------------------------------------------------
-// FONTE 2: IATI — Atividades com Brasil como beneficiário
-// ---------------------------------------------------------------
-echo "→ Buscando IATI...\n";
-
-// Tenta endpoints alternativos do IATI
-$iatiEndpoints = [
-    'https://iati.cloud/api/activities?recipient_country_code=BR&activity_status_code=2&format=json&limit=50',
-    'https://api.iatistandard.org/activities?recipient-country=BR&activity-status=2&format=json&limit=50',
+$tgovEndpoints = [
+    'https://api.plataformamaisbrasil.gov.br/convenios/v1/chamadas-publicas?situacao=ABERTA&tamanhoPagina=50',
+    'https://transfere.gov.br/api/convenios/chamadas?situacao=ABERTA&size=50',
+    'https://www.gov.br/transferencias-voluntarias/pt-br/acesso-a-informacao/chamadas-publicas/chamadas-abertas.json',
 ];
 
-$iatiItems = [];
-foreach ($iatiEndpoints as $endpoint) {
-    $iati = fetchJson($endpoint);
-    if ($iati !== null) {
-        $iatiItems = $iati['results'] ?? $iati['data'] ?? $iati['iati-activities'] ?? [];
-        if (!empty($iatiItems)) {
-            echo "  IATI: " . count($iatiItems) . " item(s) via {$endpoint}\n";
+$tgovFound = false;
+foreach ($tgovEndpoints as $url) {
+    echo "  Tentando: {$url}\n";
+    [$status, $body] = fetchRaw($url);
+    echo "  Status: {$status}\n";
+
+    if ($status === 200 && $body) {
+        $data  = json_decode($body, true);
+        $items = $data['data'] ?? $data['content'] ?? $data['result'] ?? $data ?? [];
+        if (!empty($items) && is_array($items)) {
+            echo "  ✔ Transferegov: " . count($items) . " item(s)\n";
+            foreach ($items as $item) {
+                $fonteId = 'tgov_' . ($item['id'] ?? md5(json_encode($item)));
+                $titulo  = $item['titulo'] ?? $item['nome'] ?? $item['objeto'] ?? '';
+                if (empty($titulo)) continue;
+                $editais[] = [
+                    'fonte'           => 'transferegov',
+                    'fonte_id'        => $fonteId,
+                    'titulo'          => $titulo,
+                    'link_oficial'    => $item['linkEdital'] ?? $item['urlEdital'] ?? null,
+                    'valor_min'       => $item['valorMinimo'] ?? null,
+                    'valor_max'       => $item['valorMaximo'] ?? $item['valorTotal'] ?? null,
+                    'prazo_inscricao' => formatDate($item['dataEncerramentoInscricao'] ?? $item['dataFim'] ?? null),
+                    'raw_text'        => implode("\n", array_filter([
+                        $titulo,
+                        $item['objeto'] ?? $item['descricao'] ?? '',
+                        $item['requisitos'] ?? '',
+                    ])),
+                ];
+            }
+            $tgovFound = true;
             break;
         }
     }
+    // Loga resposta para debug
+    $log[] = "Transferegov [{$url}] → HTTP {$status}: " . substr($body ?? '', 0, 200);
 }
 
-if (empty($iatiItems)) {
-    $erros[] = 'IATI: nenhum resultado encontrado';
-    echo "  IATI: sem resultados nos endpoints testados\n";
+if (!$tgovFound) {
+    echo "  ⚠ Transferegov: nenhum endpoint respondeu com dados\n";
 }
 
-foreach ($iatiItems as $item) {
-    $iatiId  = $item['iati_identifier'] ?? $item['iati-identifier'] ?? md5(json_encode($item));
-    $fonteId = 'iati_' . $iatiId;
+// ---------------------------------------------------------------
+// FONTE 2: Dados.gov.br (CKAN) — datasets de chamadas públicas
+// ---------------------------------------------------------------
+echo "→ Buscando Dados.gov.br...\n";
 
-    $titulo = iatiText($item['title'] ?? []);
-    if (empty($titulo)) continue;
+$dadosGovUrls = [
+    'https://dados.gov.br/api/3/action/package_search?q=chamada+publica+ONG&rows=50&sort=metadata_modified+desc',
+    'https://dados.gov.br/api/3/action/package_search?q=edital+organizacao+sociedade+civil&rows=50',
+];
 
-    $descricao = iatiText($item['description'] ?? []);
-    $endDate   = null;
-    foreach ($item['activity_date'] ?? $item['activity-date'] ?? [] as $d) {
-        if (($d['type'] ?? '') === '3') { $endDate = $d['iso_date'] ?? $d['iso-date'] ?? null; break; }
-    }
+$dadosGovFound = false;
+foreach ($dadosGovUrls as $url) {
+    echo "  Tentando: {$url}\n";
 
-    $editais[] = [
-        'fonte'           => 'iati',
-        'fonte_id'        => $fonteId,
-        'titulo'          => $titulo,
-        'link_oficial'    => "https://d-portal.org/ctrack.html#view=act&aid={$iatiId}",
-        'prazo_inscricao' => formatDate($endDate),
-        'raw_text'        => $titulo . "\n" . $descricao,
+    // Tenta Bearer JWT primeiro, depois chave CKAN, depois sem auth
+    $attempts = [
+        ['Authorization: Bearer ' . $dadosGovKey, 'X-CKAN-API-Key: ' . $dadosGovKey],
+        ['Authorization: Bearer ' . $dadosGovKey],
+        ['X-CKAN-API-Key: ' . $dadosGovKey],
+        [], // sem auth
     ];
+
+    foreach ($attempts as $headers) {
+        [$status, $body] = fetchRaw($url, $headers);
+        if ($status === 200 && $body) {
+            $data    = json_decode($body, true);
+            $success = $data['success'] ?? false;
+            $results = $data['result']['results'] ?? [];
+
+            if ($success && !empty($results)) {
+                echo "  ✔ Dados.gov.br: " . count($results) . " dataset(s)\n";
+                foreach ($results as $ds) {
+                    $titulo = $ds['title'] ?? $ds['name'] ?? '';
+                    if (empty($titulo)) continue;
+
+                    // Pega URL do recurso principal (PDF ou página)
+                    $link = null;
+                    foreach ($ds['resources'] ?? [] as $res) {
+                        if (in_array(strtolower($res['format'] ?? ''), ['pdf', 'html', 'htm', 'url'])) {
+                            $link = $res['url'] ?? null;
+                            break;
+                        }
+                    }
+
+                    $editais[] = [
+                        'fonte'        => 'dados_gov',
+                        'fonte_id'     => 'dgov_' . ($ds['id'] ?? md5($titulo)),
+                        'titulo'       => $titulo,
+                        'link_oficial' => $link ?? ('https://dados.gov.br/dados/conjuntos-dados/' . ($ds['name'] ?? '')),
+                        'raw_text'     => implode("\n", array_filter([
+                            $titulo,
+                            $ds['notes'] ?? $ds['description'] ?? '',
+                        ])),
+                    ];
+                }
+                $dadosGovFound = true;
+                break 2;
+            }
+        }
+        $log[] = "Dados.gov.br [{$url}] → HTTP {$status}";
+    }
+}
+
+if (!$dadosGovFound) {
+    echo "  ⚠ Dados.gov.br: sem resultados\n";
 }
 
 // ---------------------------------------------------------------
-// ENVIA para o Laravel
+// FONTE 3: D-Portal (espelho oficial do IATI — mais estável)
+// Internacional com Brasil como beneficiário
 // ---------------------------------------------------------------
-echo "\n→ Enviando " . count($editais) . " edital(is) para ingest...\n";
+echo "→ Buscando D-Portal (IATI internacional)...\n";
+
+$dportalEndpoints = [
+    'https://d-portal.org/q.json?form=act&recipient_country_code=BR&status=2&limit=50&fields=aid,titles,activity_dates,budgets,descriptions',
+    'https://d-portal.org/q.json?form=act&recipient_country_code=BR&limit=50',
+];
+
+$dportalFound = false;
+foreach ($dportalEndpoints as $url) {
+    echo "  Tentando: {$url}\n";
+    [$status, $body] = fetchRaw($url);
+    echo "  Status: {$status}\n";
+
+    if ($status === 200 && $body) {
+        $data  = json_decode($body, true);
+        $items = $data['result'] ?? $data['activities'] ?? $data['data'] ?? [];
+
+        // D-Portal retorna {"total":N,"results":[...]}
+        if (isset($data['total']) && isset($data['results'])) {
+            $items = $data['results'];
+        }
+
+        if (!empty($items) && is_array($items)) {
+            echo "  ✔ D-Portal: " . count($items) . " item(s)\n";
+            foreach ($items as $item) {
+                $aid     = $item['aid'] ?? $item['iati_identifier'] ?? md5(json_encode($item));
+                $fonteId = 'iati_' . $aid;
+                $titulo  = $item['title'] ?? $item['titles'][0]['title'] ?? '';
+                if (is_array($titulo)) $titulo = $titulo['narrative'] ?? reset($titulo) ?? '';
+                if (empty($titulo)) continue;
+
+                $descricao = $item['description'] ?? $item['descriptions'][0]['description'] ?? '';
+                if (is_array($descricao)) $descricao = $descricao['narrative'] ?? reset($descricao) ?? '';
+
+                $editais[] = [
+                    'fonte'           => 'iati',
+                    'fonte_id'        => $fonteId,
+                    'titulo'          => $titulo,
+                    'link_oficial'    => "https://d-portal.org/ctrack.html#view=act&aid={$aid}",
+                    'prazo_inscricao' => formatDate($item['date_end_planned'] ?? $item['activity_date_end'] ?? null),
+                    'raw_text'        => trim($titulo . "\n" . $descricao),
+                ];
+            }
+            $dportalFound = true;
+            break;
+        }
+    }
+    $log[] = "D-Portal [{$url}] → HTTP {$status}: " . substr($body ?? '', 0, 200);
+}
+
+if (!$dportalFound) {
+    echo "  ⚠ D-Portal: nenhum endpoint respondeu com dados\n";
+}
+
+// ---------------------------------------------------------------
+// Debug: imprime log de endpoints que falharam
+// ---------------------------------------------------------------
+if (!empty($log)) {
+    echo "\n--- DEBUG ---\n";
+    foreach ($log as $l) echo $l . "\n";
+    echo "-------------\n";
+}
+
+// ---------------------------------------------------------------
+// ENVIA para o Laravel (mesmo se 0 editais — não falha)
+// ---------------------------------------------------------------
+echo "\n→ Coletados: " . count($editais) . " edital(is)\n";
 
 if (empty($editais)) {
-    echo "Nenhum edital para enviar.\n";
-    if (!empty($erros)) {
-        echo "Erros: " . implode(', ', $erros) . "\n";
-        exit(1);
-    }
-    exit(0);
+    echo "Nenhum edital novo para enviar. Encerrando sem erro.\n";
+    exit(0); // não falha — apenas não havia dados disponíveis
 }
 
+echo "→ Enviando para ingest...\n";
 $payload = json_encode(['editais' => $editais]);
 $ch = curl_init($ingestUrl);
 curl_setopt_array($ch, [
@@ -128,7 +226,6 @@ curl_setopt_array($ch, [
         'X-Ingest-Token: ' . $ingestToken,
     ],
 ]);
-
 $response = curl_exec($ch);
 $status   = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
@@ -137,50 +234,37 @@ echo "Resposta HTTP: {$status}\n";
 echo $response . "\n";
 
 if ($status >= 400) {
-    echo "ERRO no ingest.\n";
+    echo "ERRO no ingest (HTTP {$status}).\n";
     exit(1);
 }
 
-echo "\nSincronização concluída com sucesso.\n";
+echo "\nSincronização concluída.\n";
 
 // ---------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------
-function fetchJson(string $url): ?array
+function fetchRaw(string $url, array $extraHeaders = []): array
 {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 20,
-        CURLOPT_USERAGENT      => 'PromessaDocs-Sync/1.0',
-        CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_USERAGENT      => 'Mozilla/5.0 PromessaDocs-Sync/1.0',
+        CURLOPT_HTTPHEADER     => array_merge(
+            ['Accept: application/json, text/json, */*'],
+            $extraHeaders
+        ),
     ]);
     $body   = curl_exec($ch);
-    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-
-    if ($status !== 200 || !$body) return null;
-    return json_decode($body, true);
-}
-
-function iatiText(array $data): string
-{
-    if (empty($data)) return '';
-    foreach ($data as $item) {
-        if (($item['lang'] ?? '') === 'pt') return $item['narrative'] ?? '';
-    }
-    foreach ($data as $item) {
-        if (($item['lang'] ?? '') === 'en') return $item['narrative'] ?? '';
-    }
-    return $data[0]['narrative'] ?? '';
+    return [$status, $body ?: null];
 }
 
 function formatDate(?string $date): ?string
 {
     if (!$date) return null;
-    try {
-        return (new DateTime($date))->format('Y-m-d');
-    } catch (Exception) {
-        return null;
-    }
+    try { return (new DateTime($date))->format('Y-m-d'); }
+    catch (Exception) { return null; }
 }

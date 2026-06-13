@@ -26,6 +26,7 @@ jobs:
         env:
           INGEST_URL: ${{ secrets.INGEST_URL }}
           INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
+          DADOS_GOV_KEY: ${{ secrets.DADOS_GOV_KEY }}
         run: php scripts/sync-editais.php
 
       - name: Disparar extração via Claude (após ingest)
