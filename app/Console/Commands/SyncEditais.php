@@ -9,16 +9,22 @@ use Illuminate\Console\Command;
 
 class SyncEditais extends Command
 {
-    protected $signature   = 'editais:sync';
+    protected $signature   = 'editais:sync {--sample : Busca apenas 2 editais por fonte sem chamar a IA (teste de conexão)}';
     protected $description = 'Sincroniza editais de fontes externas (Transferegov, IATI)';
 
     public function handle(EditalSyncService $sync): int
     {
-        $this->info('Iniciando sincronização de editais...');
+        $sample = $this->option('sample');
+
+        if ($sample) {
+            $this->info('Modo SAMPLE — buscando 2 editais por fonte, sem extração via IA...');
+        } else {
+            $this->info('Iniciando sincronização de editais...');
+        }
 
         $institution = Institution::where('slug', 'promessa')->firstOrFail();
 
-        $results = $sync->syncAll($institution);
+        $results = $sync->syncAll($institution, $sample ? 2 : null);
 
         foreach ($results as $fonte => $count) {
             $this->line("  [{$fonte}] {$count} novo(s) edital(is)");

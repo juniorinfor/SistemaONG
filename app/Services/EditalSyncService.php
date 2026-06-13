@@ -15,18 +15,18 @@ class EditalSyncService
      * Executa sincronização de todas as fontes.
      * Retorna contagem de novos editais adicionados.
      */
-    public function syncAll(Institution $institution): array
+    public function syncAll(Institution $institution, ?int $limit = null): array
     {
         $results = [];
-        $results['transferegov'] = $this->syncTransferegov($institution);
-        $results['iati']         = $this->syncIati($institution);
+        $results['transferegov'] = $this->syncTransferegov($institution, $limit);
+        $results['iati']         = $this->syncIati($institution, $limit);
         return $results;
     }
 
     // ---------------------------------------------------------------
     // FONTE 1: Transferegov (governo federal brasileiro)
     // ---------------------------------------------------------------
-    public function syncTransferegov(Institution $institution): int
+    public function syncTransferegov(Institution $institution, ?int $limit = null): int
     {
         try {
             $response = Http::timeout(20)->get(
@@ -40,6 +40,7 @@ class EditalSyncService
             }
 
             $items = $response->json('data', $response->json('content', []));
+            if ($limit) $items = array_slice($items, 0, $limit);
             $count = 0;
 
             foreach ($items as $item) {
@@ -49,15 +50,16 @@ class EditalSyncService
                     continue;
                 }
 
-                $texto = implode("\n", array_filter([
-                    $item['titulo'] ?? $item['nome'] ?? '',
-                    $item['objeto'] ?? $item['descricao'] ?? '',
-                    $item['requisitos'] ?? '',
-                ]));
-
-                $extracted = $this->claude->extrairEdital($texto, 'pt');
-                if (isset($extracted['error'])) {
-                    $extracted = [];
+                // No modo sample, salva os dados brutos sem chamar a IA
+                $extracted = [];
+                if (!$limit) {
+                    $texto = implode("\n", array_filter([
+                        $item['titulo'] ?? $item['nome'] ?? '',
+                        $item['objeto'] ?? $item['descricao'] ?? '',
+                        $item['requisitos'] ?? '',
+                    ]));
+                    $extracted = $this->claude->extrairEdital($texto, 'pt');
+                    if (isset($extracted['error'])) $extracted = [];
                 }
 
                 Edital::create([
@@ -71,7 +73,7 @@ class EditalSyncService
                     'valor_max'       => $extracted['valor_max'] ?? ($item['valorMaximo'] ?? $item['valorTotal'] ?? null),
                     'prazo_inscricao' => $extracted['prazo_inscricao'] ?? $this->parseDate($item['dataEncerramentoInscricao'] ?? null),
                     'prazo_execucao'  => $extracted['prazo_execucao'] ?? null,
-                    'resumo'          => $extracted['resumo'] ?? null,
+                    'resumo'          => $extracted['resumo'] ?? ($limit ? '[amostra — sem extração IA]' : null),
                     'criterios'       => $extracted['criterios'] ?? null,
                     'status'          => 'aberto',
                     'synced_at'       => now(),
@@ -91,14 +93,14 @@ class EditalSyncService
     // ---------------------------------------------------------------
     // FONTE 2: IATI (editais internacionais — Brasil como beneficiário)
     // ---------------------------------------------------------------
-    public function syncIati(Institution $institution): int
+    public function syncIati(Institution $institution, ?int $limit = null): int
     {
         try {
             $response = Http::timeout(30)->get('https://iati.cloud/api/activities', [
                 'recipient_country_code' => 'BR',
-                'activity_status_code'   => '2', // 2 = Implementation (ativo)
+                'activity_status_code'   => '2',
                 'format'                 => 'json',
-                'limit'                  => 30,
+                'limit'                  => $limit ?? 30,
                 'fields'                 => 'iati_identifier,title,description,activity_date,value',
             ]);
 
@@ -117,23 +119,20 @@ class EditalSyncService
                     continue;
                 }
 
-                // Pega título em inglês ou português
-                $titulo = $this->iatiText($item['title'] ?? []);
+                $titulo    = $this->iatiText($item['title'] ?? []);
                 $descricao = $this->iatiText($item['description'] ?? []);
 
                 if (empty($titulo)) continue;
 
-                $texto = $titulo . "\n" . $descricao;
-                $extracted = $this->claude->extrairEdital($texto, 'en');
-                if (isset($extracted['error'])) {
-                    $extracted = [];
+                // No modo sample, não chama a IA
+                $extracted = [];
+                if (!$limit) {
+                    $extracted = $this->claude->extrairEdital($titulo . "\n" . $descricao, 'en');
+                    if (isset($extracted['error'])) $extracted = [];
                 }
 
-                // Datas
                 $endDate = collect($item['activity_date'] ?? [])
-                    ->firstWhere('type', '3')['iso_date'] ?? null; // type 3 = end planned
-
-                // Valor
+                    ->firstWhere('type', '3')['iso_date'] ?? null;
                 $valor = collect($item['budget'] ?? $item['transaction'] ?? [])->pluck('value')->max();
 
                 Edital::create([
@@ -146,7 +145,7 @@ class EditalSyncService
                     'valor_min'       => null,
                     'valor_max'       => $extracted['valor_max'] ?? $valor,
                     'prazo_inscricao' => $extracted['prazo_inscricao'] ?? $this->parseDate($endDate),
-                    'resumo'          => $extracted['resumo'] ?? mb_substr($descricao, 0, 300),
+                    'resumo'          => $extracted['resumo'] ?? ($limit ? '[amostra — sem extração IA] ' . mb_substr($descricao, 0, 200) : mb_substr($descricao, 0, 300)),
                     'criterios'       => $extracted['criterios'] ?? null,
                     'status'          => 'aberto',
                     'synced_at'       => now(),
