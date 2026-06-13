@@ -155,9 +155,9 @@ foreach ($dportalEndpoints as $url) {
 
     if ($status === 200 && $body) {
         $data  = json_decode($body, true);
-        $items = $data['result'] ?? $data['activities'] ?? $data['data'] ?? [];
+        // D-Portal retorna {"rows":[...]} ou {"total":N,"results":[...]}
+        $items = $data['rows'] ?? $data['result'] ?? $data['activities'] ?? $data['data'] ?? [];
 
-        // D-Portal retorna {"total":N,"results":[...]}
         if (isset($data['total']) && isset($data['results'])) {
             $items = $data['results'];
         }
