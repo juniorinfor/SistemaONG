@@ -13,3 +13,9 @@ Schedule::command('docs:check-expirations')
     ->dailyAt('08:00')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/expiration-alerts.log'));
+
+// Sincroniza editais toda segunda-feira às 07:00
+Schedule::command('editais:sync')
+    ->weeklyOn(1, '07:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/editais-sync.log'));

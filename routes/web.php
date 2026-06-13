@@ -8,6 +8,7 @@ use App\Http\Controllers\PersonController;
 use App\Http\Controllers\ChecklistController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\TransparencyController;
+use App\Http\Controllers\EditalController;
 use Illuminate\Support\Facades\Route;
 
 // Raiz → login ou dashboard
@@ -29,6 +30,14 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('checklists',     ChecklistController::class);
 
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+
+    // Radar de Editais
+    Route::get('/editais/sync', [EditalController::class, 'syncNow'])->name('editais.sync');
+    Route::post('/editais/{edital}/compatibility', [EditalController::class, 'checkCompatibility'])->name('editais.compatibility');
+    Route::get('/editais/{attachment}/download', [EditalController::class, 'downloadAttachment'])->name('editais.attachment.download');
+    Route::resource('editais', EditalController::class)
+        ->only(['index','show','create','store','destroy'])
+        ->parameters(['editais' => 'edital']);
 
     // Perfil Breeze
     Route::get('/profile',    [ProfileController::class, 'edit'])->name('profile.edit');
