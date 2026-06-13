@@ -43,4 +43,8 @@ return [
         'key' => env('DADOS_GOV_API_KEY'),
     ],
 
+    'ingest' => [
+        'secret' => env('INGEST_SECRET'),
+    ],
+
 ];

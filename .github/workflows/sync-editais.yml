@@ -1,0 +1,39 @@
+name: Sync Editais
+
+on:
+  schedule:
+    # Toda segunda-feira às 07:00 BRT (10:00 UTC)
+    - cron: '0 10 * * 1'
+  workflow_dispatch:
+    # Permite disparo manual pelo painel do GitHub Actions
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json
+
+      - name: Sincronizar editais
+        env:
+          INGEST_URL: ${{ secrets.INGEST_URL }}
+          INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
+        run: php scripts/sync-editais.php
+
+      - name: Disparar extração via Claude (após ingest)
+        env:
+          INGEST_URL: ${{ secrets.INGEST_URL }}
+          INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
+        run: |
+          # Chama o endpoint de extração no servidor (roda editais:extract)
+          curl -s -X POST "${{ secrets.EXTRACT_URL }}" \
+            -H "X-Ingest-Token: ${{ secrets.INGEST_TOKEN }}" \
+            -H "Content-Type: application/json" || true
