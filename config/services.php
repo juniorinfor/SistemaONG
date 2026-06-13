@@ -39,4 +39,8 @@ return [
         'key' => env('ANTHROPIC_API_KEY'),
     ],
 
+    'dados_gov' => [
+        'key' => env('DADOS_GOV_API_KEY'),
+    ],
+
 ];
