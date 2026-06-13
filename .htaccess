@@ -1,0 +1,8 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /documentos/
+
+    # Não redireciona se já está dentro de /public/
+    RewriteCond %{REQUEST_URI} !^/documentos/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
