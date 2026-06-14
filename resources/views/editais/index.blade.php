@@ -14,6 +14,8 @@
     gap: 16px;
     align-items: flex-start;
     transition: box-shadow .15s;
+    overflow: hidden;
+    min-width: 0;
 }
 .edital-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,.08); }
 .edital-prazo-badge {
@@ -35,7 +37,8 @@
 .edital-titulo {
     font-size: 14px; font-weight: 600; color: var(--texto);
     margin-bottom: 4px; line-height: 1.4;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
 .edital-resumo {
     font-size: 12px; color: var(--cinza-light);
@@ -61,13 +64,15 @@
 .filter-row {
     display: flex; gap: 10px; flex-wrap: wrap;
     margin-bottom: 20px; align-items: center;
+    max-width: 100%; overflow: hidden;
 }
 .filter-row input, .filter-row select {
     border: 1px solid var(--cinza-borda); border-radius: 8px;
     padding: 8px 12px; font-size: 13px;
     font-family: 'Roboto', sans-serif; background: #fff; color: var(--texto);
+    max-width: 100%;
 }
-.filter-row input { flex: 1; min-width: 200px; }
+.filter-row input { flex: 1; min-width: 160px; }
 .filter-row input:focus, .filter-row select:focus {
     outline: none; border-color: var(--teal);
 }
