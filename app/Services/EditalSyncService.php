@@ -21,6 +21,7 @@ class EditalSyncService
         $results['transferegov'] = $this->syncTransferegov($institution, $limit);
         $results['iati']         = $this->syncIati($institution, $limit);
         $results['dportal']      = $this->syncDPortal($institution, $limit);
+        $results['dados_gov']    = $this->syncDadosGov($institution, $limit);
         return $results;
     }
 
@@ -230,6 +231,91 @@ class EditalSyncService
             Log::error('D-Portal sync error', ['message' => $e->getMessage()]);
             return 0;
         }
+    }
+
+    // ---------------------------------------------------------------
+    // FONTE 4: Dados.gov.br (CKAN) — datasets de chamadas públicas
+    // ---------------------------------------------------------------
+    public function syncDadosGov(Institution $institution, ?int $limit = null): int
+    {
+        $key = config('services.dados_gov.key');
+
+        $queries = [
+            'chamada publica organizacao sociedade civil',
+            'edital ONG assistencia social',
+        ];
+
+        $headers = array_filter([
+            'Accept' => 'application/json',
+            'Authorization' => $key ? "Bearer {$key}" : null,
+        ]);
+
+        foreach ($queries as $q) {
+            try {
+                $response = Http::timeout(20)
+                    ->withHeaders($headers)
+                    ->get('https://dados.gov.br/api/3/action/package_search', [
+                        'q'    => $q,
+                        'rows' => $limit ?? 50,
+                        'sort' => 'metadata_modified desc',
+                    ]);
+
+                if ($response->failed()) {
+                    Log::warning('Dados.gov.br falhou', ['status' => $response->status(), 'q' => $q]);
+                    continue;
+                }
+
+                $results = $response->json('result.results', []);
+                if (empty($results)) continue;
+
+                $count = 0;
+                foreach ($results as $ds) {
+                    $titulo = $ds['title'] ?? $ds['name'] ?? '';
+                    if (empty($titulo)) continue;
+
+                    $fonteId = 'dgov_' . ($ds['id'] ?? md5($titulo));
+                    if (Edital::where('fonte', 'dados_gov')->where('fonte_id', $fonteId)->exists()) {
+                        continue;
+                    }
+
+                    $link = null;
+                    foreach ($ds['resources'] ?? [] as $res) {
+                        if (in_array(strtolower($res['format'] ?? ''), ['pdf', 'html', 'htm', 'url'])) {
+                            $link = $res['url'] ?? null;
+                            break;
+                        }
+                    }
+
+                    $rawText = implode("\n", array_filter([$titulo, $ds['notes'] ?? '']));
+                    $extracted = [];
+                    if (!$limit) {
+                        $extracted = $this->claude->extrairEdital($rawText, 'pt');
+                        if (isset($extracted['error'])) $extracted = [];
+                    }
+
+                    Edital::create([
+                        'institution_id'  => $institution->id,
+                        'titulo'          => $extracted['titulo'] ?? $titulo,
+                        'area'            => $extracted['area'] ?? null,
+                        'fonte'           => 'dados_gov',
+                        'fonte_id'        => $fonteId,
+                        'link_oficial'    => $link ?? ('https://dados.gov.br/dados/conjuntos-dados/' . ($ds['name'] ?? '')),
+                        'resumo'          => $extracted['resumo'] ?? ($limit ? '[amostra]' : mb_substr($ds['notes'] ?? '', 0, 300)),
+                        'criterios'       => $extracted['criterios'] ?? null,
+                        'status'          => 'aberto',
+                        'synced_at'       => now(),
+                    ]);
+                    $count++;
+                }
+
+                if ($count > 0) return $count;
+
+            } catch (\Throwable $e) {
+                Log::error('Dados.gov.br sync error', ['message' => $e->getMessage(), 'q' => $q]);
+            }
+        }
+
+        return 0;
     }
 
     // ---------------------------------------------------------------
