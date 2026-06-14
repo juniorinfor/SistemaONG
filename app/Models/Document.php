@@ -58,14 +58,15 @@ class Document extends Model
             return 'sem_validade';
         }
 
-        $today = Carbon::today();
+        $today    = Carbon::today();
         $warnDays = config('documents.warn_days_before_expiry', 30);
+        $warnDate = $today->copy()->addDays($warnDays);
 
-        if ($this->expires_at->isPast()) {
+        if ($this->expires_at->lt($today)) {
             return 'vencido';
         }
 
-        if ($this->expires_at->diffInDays($today) <= $warnDays) {
+        if ($this->expires_at->lte($warnDate)) {
             return 'vence_em_breve';
         }
 
