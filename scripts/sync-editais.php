@@ -194,7 +194,101 @@ if (!$qdFound) {
 }
 
 // ---------------------------------------------------------------
-// FONTE 4: D-Portal (espelho oficial do IATI — mais estável)
+// FONTE 4: UNDP Procurement Notices — RSS público PNUD/Brasil
+// ---------------------------------------------------------------
+echo "→ Buscando UNDP...\n";
+
+$undpUrls = [
+    'https://procurement-notices.undp.org/rss.cfm?country=BRA',
+    'https://procurement-notices.undp.org/rss.cfm',
+];
+
+$undpFound = false;
+foreach ($undpUrls as $url) {
+    echo "  Tentando: {$url}\n";
+    [$status, $body] = fetchRaw($url, ['Accept: application/rss+xml, text/xml']);
+    echo "  Status: {$status}\n";
+
+    if ($status === 200 && $body) {
+        $xml = @simplexml_load_string($body);
+        if ($xml) {
+            $items = $xml->channel->item ?? [];
+            $added = 0;
+            foreach ($items as $item) {
+                $titulo    = (string) ($item->title ?? '');
+                $descricao = strip_tags((string) ($item->description ?? ''));
+                if (empty($titulo)) continue;
+
+                $editais[] = [
+                    'fonte'        => 'undp',
+                    'fonte_id'     => 'undp_' . md5((string) ($item->link ?? $item->guid ?? $titulo)),
+                    'titulo'       => $titulo,
+                    'link_oficial' => (string) ($item->link ?? ''),
+                    'raw_text'     => mb_substr($titulo . "\n" . $descricao, 0, 3000),
+                ];
+                $added++;
+            }
+            if ($added > 0) {
+                echo "  ✔ UNDP: {$added} item(s)\n";
+                $undpFound = true;
+                break;
+            }
+        }
+    }
+    $log[] = "UNDP [{$url}] → HTTP {$status}";
+}
+if (!$undpFound) echo "  ⚠ UNDP: sem resultados\n";
+
+// ---------------------------------------------------------------
+// FONTE 5: EU Grants — Portal Financiamento União Europeia
+// ---------------------------------------------------------------
+echo "→ Buscando EU Grants...\n";
+
+$euUrl = 'https://api.tech.ec.europa.eu/search-api/prod/rest/search?' . http_build_query([
+    'apiKey'     => 'SEDIA',
+    'text'       => 'civil society social Brazil',
+    'pageSize'   => 20,
+    'pageNumber' => 1,
+    'scope'      => 'SEDIA',
+]);
+echo "  Tentando: {$euUrl}\n";
+[$euStatus, $euBody] = fetchRaw($euUrl, ['Accept: application/json']);
+echo "  Status: {$euStatus}\n";
+
+if ($euStatus === 200 && $euBody) {
+    $euData  = json_decode($euBody, true);
+    $euItems = $euData['results'] ?? $euData['hits']['hits'] ?? [];
+    $euAdded = 0;
+    foreach ($euItems as $item) {
+        $src    = $item['_source'] ?? $item;
+        $id     = $src['identifier'] ?? $src['id'] ?? md5(json_encode($src));
+        $titulo = $src['title'] ?? $src['name'] ?? '';
+        if (is_array($titulo)) $titulo = $titulo['en'] ?? reset($titulo) ?? '';
+        if (empty($titulo)) continue;
+
+        $descricao = $src['description'] ?? $src['summary'] ?? '';
+        if (is_array($descricao)) $descricao = $descricao['en'] ?? reset($descricao) ?? '';
+
+        $editais[] = [
+            'fonte'           => 'eu_grants',
+            'fonte_id'        => 'eu_' . $id,
+            'titulo'          => $titulo,
+            'link_oficial'    => $src['callDetailsUrl'] ?? $src['url'] ?? null,
+            'prazo_inscricao' => formatDate($src['deadlineDate'] ?? $src['endDate'] ?? null),
+            'valor_max'       => $src['budgetMax'] ?? $src['budget'] ?? null,
+            'raw_text'        => mb_substr($titulo . "\n" . $descricao, 0, 3000),
+        ];
+        $euAdded++;
+    }
+    if ($euAdded > 0) echo "  ✔ EU Grants: {$euAdded} item(s)\n";
+    else { echo "  ⚠ EU Grants: sem resultados\n"; $log[] = "EU Grants → HTTP {$euStatus}: " . substr($euBody, 0, 200); }
+} else {
+    echo "  ⚠ EU Grants: HTTP {$euStatus}\n";
+    $log[] = "EU Grants → HTTP {$euStatus}";
+}
+
+// ---------------------------------------------------------------
+// FONTE 6: D-Portal (espelho oficial do IATI — mais estável)
 // Internacional com Brasil como beneficiário
 // ---------------------------------------------------------------
 echo "→ Buscando D-Portal (IATI internacional)...\n";

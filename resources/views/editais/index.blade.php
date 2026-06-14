@@ -127,6 +127,8 @@
         <option value="iati"          {{ request('fonte') === 'iati'          ? 'selected' : '' }}>Internacional</option>
         <option value="querido_diario"{{ request('fonte') === 'querido_diario'? 'selected' : '' }}>Diário Oficial</option>
         <option value="dados_gov"     {{ request('fonte') === 'dados_gov'     ? 'selected' : '' }}>Dados.gov.br</option>
+        <option value="undp"          {{ request('fonte') === 'undp'          ? 'selected' : '' }}>UNDP / ONU</option>
+        <option value="eu_grants"     {{ request('fonte') === 'eu_grants'     ? 'selected' : '' }}>EU Grants</option>
         <option value="manual"        {{ request('fonte') === 'manual'        ? 'selected' : '' }}>Manual</option>
     </select>
     <button class="btn btn-ghost btn-sm" type="submit">Filtrar</button>
@@ -162,6 +164,8 @@
         'querido_diario'=> 'Diário Oficial',
         'dados_gov'     => 'Dados.gov.br',
         'dou'           => 'Diário Oficial',
+        'undp'          => 'UNDP / ONU',
+        'eu_grants'     => 'EU Grants',
         default         => 'Manual',
     };
 @endphp

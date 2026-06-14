@@ -18,11 +18,13 @@ class EditalSyncService
     public function syncAll(Institution $institution, ?int $limit = null): array
     {
         $results = [];
-        $results['transferegov']  = $this->syncTransferegov($institution, $limit);
-        $results['iati']          = $this->syncIati($institution, $limit);
-        $results['dportal']       = $this->syncDPortal($institution, $limit);
-        $results['dados_gov']     = $this->syncDadosGov($institution, $limit);
+        $results['transferegov']   = $this->syncTransferegov($institution, $limit);
+        $results['iati']           = $this->syncIati($institution, $limit);
+        $results['dportal']        = $this->syncDPortal($institution, $limit);
+        $results['dados_gov']      = $this->syncDadosGov($institution, $limit);
         $results['querido_diario'] = $this->syncQueridoDiario($institution, $limit);
+        $results['undp']           = $this->syncUndp($institution, $limit);
+        $results['eu_grants']      = $this->syncEuGrants($institution, $limit);
         return $results;
     }
 
@@ -394,6 +396,161 @@ class EditalSyncService
         }
 
         return 0;
+    }
+
+    // ---------------------------------------------------------------
+    // FONTE 6: UNDP Procurement Notices — projetos ONU com Brasil
+    // ---------------------------------------------------------------
+    public function syncUndp(Institution $institution, ?int $limit = null): int
+    {
+        // RSS público de notificações de procurement do PNUD
+        $urls = [
+            'https://procurement-notices.undp.org/rss.cfm?country=BRA',
+            'https://procurement-notices.undp.org/rss.cfm',
+        ];
+
+        foreach ($urls as $url) {
+            try {
+                $response = Http::timeout(20)
+                    ->withHeaders(['Accept' => 'application/rss+xml, application/xml, text/xml'])
+                    ->get($url);
+
+                if ($response->failed() || empty($response->body())) continue;
+
+                $xml = @simplexml_load_string($response->body());
+                if (!$xml) continue;
+
+                $items = $xml->channel->item ?? [];
+                $count = 0;
+
+                foreach ($items as $item) {
+                    $fonteId = 'undp_' . md5((string) ($item->link ?? $item->guid ?? ''));
+                    if (Edital::where('fonte', 'undp')->where('fonte_id', $fonteId)->exists()) continue;
+
+                    $titulo    = (string) ($item->title ?? '');
+                    $descricao = strip_tags((string) ($item->description ?? ''));
+                    if (empty($titulo)) continue;
+
+                    $rawText   = $titulo . "\n" . $descricao;
+                    $extracted = [];
+                    if (!$limit) {
+                        $extracted = $this->claude->extrairEdital(mb_substr($rawText, 0, 3000), 'en');
+                        if (isset($extracted['error'])) $extracted = [];
+                    }
+
+                    $prazo = null;
+                    if (!empty((string) ($item->pubDate ?? ''))) {
+                        try { $prazo = \Carbon\Carbon::parse((string) $item->pubDate)->addDays(30)->toDateString(); }
+                        catch (\Throwable) {}
+                    }
+
+                    Edital::create([
+                        'institution_id'  => $institution->id,
+                        'titulo'          => $extracted['titulo'] ?? $titulo,
+                        'area'            => $extracted['area'] ?? 'cooperação internacional',
+                        'fonte'           => 'undp',
+                        'fonte_id'        => $fonteId,
+                        'link_oficial'    => (string) ($item->link ?? ''),
+                        'resumo'          => $extracted['resumo'] ?? mb_substr($descricao, 0, 300),
+                        'criterios'       => $extracted['criterios'] ?? null,
+                        'prazo_inscricao' => $extracted['prazo_inscricao'] ?? $prazo,
+                        'valor_max'       => $extracted['valor_max'] ?? null,
+                        'status'          => 'aberto',
+                        'synced_at'       => now(),
+                    ]);
+
+                    $count++;
+                    if ($limit && $count >= $limit) return $count;
+                }
+
+                if ($count > 0 || !empty($items)) return $count;
+
+            } catch (\Throwable $e) {
+                Log::error('UNDP sync error', ['message' => $e->getMessage(), 'url' => $url]);
+            }
+        }
+
+        return 0;
+    }
+
+    // ---------------------------------------------------------------
+    // FONTE 7: EU Grants (Portal Financiamento UE) — elegíveis p/ Brasil
+    // ---------------------------------------------------------------
+    public function syncEuGrants(Institution $institution, ?int $limit = null): int
+    {
+        try {
+            // API pública do portal EU Funding & Tenders (chave SEDIA é pública)
+            $response = Http::timeout(20)
+                ->withHeaders(['Accept' => 'application/json'])
+                ->get('https://api.tech.ec.europa.eu/search-api/prod/rest/search', [
+                    'apiKey'     => 'SEDIA',
+                    'text'       => 'civil society social Brazil',
+                    'pageSize'   => $limit ?? 20,
+                    'pageNumber' => 1,
+                    'scope'      => 'SEDIA',
+                ]);
+
+            if ($response->failed()) {
+                Log::warning('EU Grants API falhou', ['status' => $response->status()]);
+                return 0;
+            }
+
+            $results = $response->json('results', $response->json('hits.hits', []));
+            $count   = 0;
+
+            foreach ($results as $item) {
+                $src     = $item['_source'] ?? $item;
+                $id      = $src['identifier'] ?? $src['id'] ?? md5(json_encode($src));
+                $fonteId = 'eu_' . $id;
+
+                if (Edital::where('fonte', 'eu_grants')->where('fonte_id', $fonteId)->exists()) continue;
+
+                $titulo = $src['title'] ?? $src['name'] ?? '';
+                if (is_array($titulo)) $titulo = $titulo['en'] ?? reset($titulo) ?? '';
+                if (empty($titulo)) continue;
+
+                $descricao = $src['description'] ?? $src['summary'] ?? '';
+                if (is_array($descricao)) $descricao = $descricao['en'] ?? reset($descricao) ?? '';
+
+                $rawText   = $titulo . "\n" . $descricao;
+                $extracted = [];
+                if (!$limit) {
+                    $extracted = $this->claude->extrairEdital(mb_substr($rawText, 0, 3000), 'en');
+                    if (isset($extracted['error'])) $extracted = [];
+                }
+
+                $link = $src['callDetailsUrl']
+                    ?? $src['url']
+                    ?? ('https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/' . strtolower($id));
+
+                Edital::create([
+                    'institution_id'  => $institution->id,
+                    'titulo'          => $extracted['titulo'] ?? $titulo,
+                    'area'            => $extracted['area'] ?? 'cooperação europeia',
+                    'fonte'           => 'eu_grants',
+                    'fonte_id'        => $fonteId,
+                    'link_oficial'    => $link,
+                    'resumo'          => $extracted['resumo'] ?? mb_substr($descricao, 0, 300),
+                    'criterios'       => $extracted['criterios'] ?? null,
+                    'prazo_inscricao' => $extracted['prazo_inscricao']
+                        ?? $this->parseDate($src['deadlineDate'] ?? $src['endDate'] ?? null),
+                    'valor_min'       => $extracted['valor_min'] ?? null,
+                    'valor_max'       => $extracted['valor_max']
+                        ?? ($src['budgetMax'] ?? $src['budget'] ?? null),
+                    'status'          => 'aberto',
+                    'synced_at'       => now(),
+                ]);
+
+                $count++;
+                if ($limit && $count >= $limit) return $count;
+            }
+
+            return $count;
+
+        } catch (\Throwable $e) {
+            Log::error('EU Grants sync error', ['message' => $e->getMessage()]);
+            return 0;
+        }
     }
 
     // ---------------------------------------------------------------
