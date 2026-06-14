@@ -20,7 +20,7 @@
             {{-- Tipo de documento --}}
             <div class="form-group">
                 <label class="form-label">Tipo de documento <span style="color:#e53935;">*</span></label>
-                <select name="document_type_id" class="form-control @error('document_type_id') is-invalid @enderror" required>
+                <select name="document_type_id" id="type-select" class="form-control @error('document_type_id') is-invalid @enderror" required>
                     <option value="">Selecione...</option>
                     @foreach($documentTypes as $category => $types)
                         @php
@@ -38,6 +38,9 @@
                         <optgroup label="{{ $catLabel }}">
                             @foreach($types as $type)
                                 <option value="{{ $type->id }}"
+                                    data-instructions="{{ e($type->instructions) }}"
+                                    data-url="{{ $type->official_url }}"
+                                    data-validity="{{ $type->validity_days }}"
                                     {{ (old('document_type_id', $selectedType?->id) == $type->id) ? 'selected' : '' }}>
                                     {{ $type->name }}
                                 </option>
@@ -48,6 +51,24 @@
                 @error('document_type_id')
                     <div class="field-error">{{ $message }}</div>
                 @enderror
+            </div>
+
+            {{-- Painel de instruções (aparece ao selecionar tipo) --}}
+            <div id="type-info" style="display:none;background:#f0faf7;border:1px solid #b2dfdb;border-radius:10px;padding:16px 18px;margin-bottom:20px;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#00897b;margin-bottom:6px;">
+                            Sobre este documento
+                        </div>
+                        <div id="type-instructions" style="font-size:13px;color:var(--texto);line-height:1.6;white-space:pre-wrap;"></div>
+                    </div>
+                </div>
+                <div id="type-url-wrap" style="display:none;margin-top:12px;padding-top:10px;border-top:1px solid #b2dfdb;">
+                    <a id="type-url" href="#" target="_blank"
+                       style="font-size:12px;color:#00897b;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
+                        ↗ Acessar site oficial para obter o documento
+                    </a>
+                </div>
             </div>
 
             {{-- Pessoa (opcional) --}}
@@ -133,6 +154,7 @@
 </div>
 
 <script>
+// Upload drag-and-drop
 const input = document.getElementById('file-input');
 const zone  = document.getElementById('drop-zone');
 const label = document.getElementById('file-name');
@@ -144,7 +166,6 @@ input.addEventListener('change', () => {
         zone.style.borderColor = 'var(--teal)';
     }
 });
-
 zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = 'var(--teal)'; });
 zone.addEventListener('dragleave', () => { zone.style.borderColor = 'var(--borda)'; });
 zone.addEventListener('drop', e => {
@@ -156,6 +177,59 @@ zone.addEventListener('drop', e => {
         label.style.display = 'block';
     }
 });
+
+// Painel de instruções do tipo de documento
+const typeSelect    = document.getElementById('type-select');
+const typeInfo      = document.getElementById('type-info');
+const typeInstr     = document.getElementById('type-instructions');
+const typeUrlWrap   = document.getElementById('type-url-wrap');
+const typeUrl       = document.getElementById('type-url');
+const issuedInput   = document.querySelector('input[name="issued_at"]');
+const expiresInput  = document.querySelector('input[name="expires_at"]');
+
+function updateTypeInfo() {
+    const opt = typeSelect.options[typeSelect.selectedIndex];
+    if (!opt || !opt.value) { typeInfo.style.display = 'none'; return; }
+
+    const instructions = opt.dataset.instructions || '';
+    const url          = opt.dataset.url || '';
+    const validity     = parseInt(opt.dataset.validity) || 0;
+
+    typeInstr.textContent = instructions || 'Sem instruções cadastradas para este tipo.';
+    typeInfo.style.display = 'block';
+
+    if (url) {
+        typeUrl.href = url;
+        typeUrlWrap.style.display = 'block';
+    } else {
+        typeUrlWrap.style.display = 'none';
+    }
+
+    // Sugere vencimento automaticamente se issued_at preenchido e validity_days existe
+    if (validity > 0 && issuedInput.value && !expiresInput.value) {
+        const issued  = new Date(issuedInput.value);
+        issued.setDate(issued.getDate() + validity);
+        expiresInput.value = issued.toISOString().split('T')[0];
+    }
+    if (validity === 0) {
+        expiresInput.value = '';
+        expiresInput.placeholder = 'Sem vencimento';
+    }
+}
+
+typeSelect.addEventListener('change', updateTypeInfo);
+issuedInput.addEventListener('change', () => {
+    const opt      = typeSelect.options[typeSelect.selectedIndex];
+    const validity = opt ? parseInt(opt.dataset.validity) || 0 : 0;
+    if (validity > 0 && issuedInput.value) {
+        const issued = new Date(issuedInput.value);
+        issued.setDate(issued.getDate() + validity);
+        expiresInput.value = issued.toISOString().split('T')[0];
+    }
+});
+
+// Inicializa se tipo já selecionado (ex: vindo do catálogo)
+if (typeSelect.value) updateTypeInfo();
 </script>
 
 @endsection
