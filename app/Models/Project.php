@@ -78,7 +78,7 @@ class Project extends Model
             'concluido'     => '#e8f5e9',
             'cancelado'     => '#f5f5f5',
             default         => '#f5f5f5',
-        ];
+        };
     }
 
     public function getValorPleiteadoFormatadoAttribute(): ?string
