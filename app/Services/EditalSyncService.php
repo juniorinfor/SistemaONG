@@ -18,10 +18,11 @@ class EditalSyncService
     public function syncAll(Institution $institution, ?int $limit = null): array
     {
         $results = [];
-        $results['transferegov'] = $this->syncTransferegov($institution, $limit);
-        $results['iati']         = $this->syncIati($institution, $limit);
-        $results['dportal']      = $this->syncDPortal($institution, $limit);
-        $results['dados_gov']    = $this->syncDadosGov($institution, $limit);
+        $results['transferegov']  = $this->syncTransferegov($institution, $limit);
+        $results['iati']          = $this->syncIati($institution, $limit);
+        $results['dportal']       = $this->syncDPortal($institution, $limit);
+        $results['dados_gov']     = $this->syncDadosGov($institution, $limit);
+        $results['querido_diario'] = $this->syncQueridoDiario($institution, $limit);
         return $results;
     }
 
@@ -234,7 +235,84 @@ class EditalSyncService
     }
 
     // ---------------------------------------------------------------
-    // FONTE 4: Dados.gov.br (CKAN) — datasets de chamadas públicas
+    // FONTE 4: Querido Diário (Open Knowledge Brasil) — últimos 30 dias
+    // ---------------------------------------------------------------
+    public function syncQueridoDiario(Institution $institution, ?int $limit = null): int
+    {
+        $since   = now()->subDays(30)->format('Y-m-d');
+        $queries = [
+            'chamamento publico organizacao sociedade civil',
+            'edital assistencia social ONG',
+        ];
+
+        $count = 0;
+
+        foreach ($queries as $q) {
+            try {
+                $response = Http::timeout(20)->get('https://queridodiario.ok.org.br/api/gazettes', [
+                    'querystring' => $q,
+                    'since'       => $since,
+                    'size'        => $limit ?? 20,
+                    'sort_by'     => 'relevance',
+                ]);
+
+                if ($response->failed()) {
+                    Log::warning('Querido Diário falhou', ['status' => $response->status(), 'q' => $q]);
+                    continue;
+                }
+
+                $gazettes = $response->json('gazettes', []);
+
+                foreach ($gazettes as $gazette) {
+                    $fonteId = 'qd_' . md5($gazette['url'] ?? $gazette['date'] . $gazette['territory_id']);
+
+                    if (Edital::where('fonte', 'querido_diario')->where('fonte_id', $fonteId)->exists()) {
+                        continue;
+                    }
+
+                    $excerpts = $gazette['excerpts'] ?? [];
+                    $rawText  = "[{$gazette['territory_name']} — {$gazette['date']}]\n"
+                              . implode("\n\n", $excerpts);
+
+                    $extracted = [];
+                    if (!$limit) {
+                        $extracted = $this->claude->extrairEdital(mb_substr($rawText, 0, 3000), 'pt');
+                        if (isset($extracted['error'])) $extracted = [];
+                    }
+
+                    $titulo = $extracted['titulo']
+                        ?? "Diário {$gazette['territory_name']} — " . \Carbon\Carbon::parse($gazette['date'])->format('d/m/Y');
+
+                    Edital::create([
+                        'institution_id'  => $institution->id,
+                        'titulo'          => $titulo,
+                        'area'            => $extracted['area'] ?? null,
+                        'fonte'           => 'querido_diario',
+                        'fonte_id'        => $fonteId,
+                        'link_oficial'    => $gazette['url'] ?? null,
+                        'resumo'          => $extracted['resumo'] ?? mb_substr(implode(' ', $excerpts), 0, 300),
+                        'criterios'       => $extracted['criterios'] ?? null,
+                        'prazo_inscricao' => $extracted['prazo_inscricao'] ?? null,
+                        'valor_min'       => $extracted['valor_min'] ?? null,
+                        'valor_max'       => $extracted['valor_max'] ?? null,
+                        'status'          => 'aberto',
+                        'synced_at'       => now(),
+                    ]);
+
+                    $count++;
+                    if ($limit && $count >= $limit) return $count;
+                }
+
+            } catch (\Throwable $e) {
+                Log::error('Querido Diário sync error', ['message' => $e->getMessage(), 'q' => $q]);
+            }
+        }
+
+        return $count;
+    }
+
+    // ---------------------------------------------------------------
+    // FONTE 5: Dados.gov.br (CKAN) — datasets de chamadas públicas
     // ---------------------------------------------------------------
     public function syncDadosGov(Institution $institution, ?int $limit = null): int
     {

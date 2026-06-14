@@ -123,9 +123,11 @@
     </select>
     <select name="fonte">
         <option value="">Todas as fontes</option>
-        <option value="transferegov" {{ request('fonte') === 'transferegov' ? 'selected' : '' }}>Gov Federal</option>
-        <option value="iati"         {{ request('fonte') === 'iati'         ? 'selected' : '' }}>Internacional</option>
-        <option value="manual"       {{ request('fonte') === 'manual'       ? 'selected' : '' }}>Manual</option>
+        <option value="transferegov"  {{ request('fonte') === 'transferegov'  ? 'selected' : '' }}>Gov Federal</option>
+        <option value="iati"          {{ request('fonte') === 'iati'          ? 'selected' : '' }}>Internacional</option>
+        <option value="querido_diario"{{ request('fonte') === 'querido_diario'? 'selected' : '' }}>Diário Oficial</option>
+        <option value="dados_gov"     {{ request('fonte') === 'dados_gov'     ? 'selected' : '' }}>Dados.gov.br</option>
+        <option value="manual"        {{ request('fonte') === 'manual'        ? 'selected' : '' }}>Manual</option>
     </select>
     <button class="btn btn-ghost btn-sm" type="submit">Filtrar</button>
     <a href="{{ route('editais.index') }}" class="btn btn-ghost btn-sm">Limpar</a>
@@ -155,10 +157,12 @@
     };
     $score = $edital->compatibility_score;
     $fonteLabel = match($edital->fonte) {
-        'transferegov' => 'Gov Federal',
-        'iati'         => 'Internacional',
-        'dou'          => 'Diário Oficial',
-        default        => 'Manual',
+        'transferegov'  => 'Gov Federal',
+        'iati'          => 'Internacional',
+        'querido_diario'=> 'Diário Oficial',
+        'dados_gov'     => 'Dados.gov.br',
+        'dou'           => 'Diário Oficial',
+        default         => 'Manual',
     };
 @endphp
 <div class="edital-card">

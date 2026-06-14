@@ -137,7 +137,64 @@ if (!$dadosGovFound) {
 }
 
 // ---------------------------------------------------------------
-// FONTE 3: D-Portal (espelho oficial do IATI — mais estável)
+// FONTE 3: Querido Diário — últimos 30 dias, diários municipais/estaduais BR
+// ---------------------------------------------------------------
+echo "→ Buscando Querido Diário...\n";
+
+$since     = date('Y-m-d', strtotime('-30 days'));
+$qdQueries = [
+    'chamamento publico organizacao sociedade civil',
+    'edital assistencia social ONG',
+];
+
+$qdFound = false;
+foreach ($qdQueries as $q) {
+    $url = 'https://queridodiario.ok.org.br/api/gazettes?' . http_build_query([
+        'querystring' => $q,
+        'since'       => $since,
+        'size'        => 20,
+        'sort_by'     => 'relevance',
+    ]);
+    echo "  Tentando: {$url}\n";
+    [$status, $body] = fetchRaw($url);
+    echo "  Status: {$status}\n";
+
+    if ($status === 200 && $body) {
+        $data     = json_decode($body, true);
+        $gazettes = $data['gazettes'] ?? [];
+
+        foreach ($gazettes as $gazette) {
+            $excerpts = $gazette['excerpts'] ?? [];
+            if (empty($excerpts)) continue;
+
+            $fonteId = 'qd_' . md5($gazette['url'] ?? ($gazette['date'] . ($gazette['territory_id'] ?? '')));
+            $rawText = "[{$gazette['territory_name']} — {$gazette['date']}]\n"
+                     . mb_substr(implode("\n\n", $excerpts), 0, 3000);
+
+            $editais[] = [
+                'fonte'        => 'querido_diario',
+                'fonte_id'     => $fonteId,
+                'titulo'       => "Diário {$gazette['territory_name']} — " . date('d/m/Y', strtotime($gazette['date'])),
+                'link_oficial' => $gazette['url'] ?? null,
+                'raw_text'     => $rawText,
+            ];
+        }
+
+        if (!empty($gazettes)) {
+            echo "  ✔ Querido Diário: " . count($gazettes) . " gazette(s)\n";
+            $qdFound = true;
+            break;
+        }
+    }
+    $log[] = "Querido Diário [{$q}] → HTTP {$status}";
+}
+
+if (!$qdFound) {
+    echo "  ⚠ Querido Diário: sem resultados\n";
+}
+
+// ---------------------------------------------------------------
+// FONTE 4: D-Portal (espelho oficial do IATI — mais estável)
 // Internacional com Brasil como beneficiário
 // ---------------------------------------------------------------
 echo "→ Buscando D-Portal (IATI internacional)...\n";
