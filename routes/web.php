@@ -31,6 +31,9 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('checklists',     ChecklistController::class);
 
     Route::resource('projects', ProjectController::class);
+    Route::post('/projects/{project}/attachments', [ProjectController::class, 'storeAttachment'])->name('projects.attachments.store');
+    Route::get('/projects/{project}/attachments/{attachment}/download', [ProjectController::class, 'downloadAttachment'])->name('projects.attachments.download');
+    Route::delete('/projects/{project}/attachments/{attachment}', [ProjectController::class, 'destroyAttachment'])->name('projects.attachments.destroy');
 
     Route::get('/settings',   [SettingsController::class, 'index'])->name('settings.index');
     Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');

@@ -90,6 +90,73 @@
     </div>
     @endif
 
+    {{-- Anexos (proposta, plano, orçamento...) --}}
+    <div class="card" style="margin-bottom:16px;">
+        <div class="card-header">
+            <span class="card-title">Documentos do projeto</span>
+            <span style="font-size:12px;color:var(--cinza-light);">{{ $project->attachments->count() }} arquivo(s)</span>
+        </div>
+        <div class="card-body">
+
+            @forelse($project->attachments as $att)
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 0;{{ !$loop->first ? 'border-top:1px solid var(--cinza-borda);' : '' }}">
+                <div style="font-size:22px;flex-shrink:0;">{{ $att->icone }}</div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:13px;font-weight:500;color:var(--texto);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $att->nome }}</div>
+                    <div style="font-size:11px;color:var(--cinza-light);">
+                        <span style="background:#e3f2fd;color:#1565c0;padding:1px 8px;border-radius:12px;">{{ $att->tipoLabel }}</span>
+                        · {{ $att->tamanhoFormatado }}
+                        · {{ $att->created_at->format('d/m/Y') }}
+                    </div>
+                </div>
+                <div style="display:flex;gap:6px;flex-shrink:0;">
+                    <a href="{{ route('projects.attachments.download', [$project, $att]) }}" class="btn btn-ghost btn-sm" title="Baixar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </a>
+                    <form method="POST" action="{{ route('projects.attachments.destroy', [$project, $att]) }}"
+                          onsubmit="return confirm('Remover este anexo?')" style="display:inline;">
+                        @csrf @method('DELETE')
+                        <button type="submit" class="btn btn-ghost btn-sm" style="color:#e53935;" title="Remover">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            @empty
+            <p style="font-size:13px;color:var(--cinza-light);margin:0 0 14px;">Nenhum documento anexado ainda. Anexe a proposta, o plano de trabalho ou o orçamento.</p>
+            @endforelse
+
+            {{-- Formulário de upload --}}
+            <form method="POST" action="{{ route('projects.attachments.store', $project) }}"
+                  enctype="multipart/form-data"
+                  style="margin-top:16px;padding-top:16px;border-top:1px solid var(--cinza-borda);">
+                @csrf
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+                    <div style="flex:1;min-width:200px;">
+                        <label class="form-label" style="font-size:11px;">Arquivo (PDF, DOC, XLS, imagem · máx. 20 MB)</label>
+                        <input type="file" name="arquivo" class="form-control @error('arquivo') is-invalid @enderror"
+                               accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" required>
+                    </div>
+                    <div style="min-width:150px;">
+                        <label class="form-label" style="font-size:11px;">Tipo</label>
+                        <select name="tipo" class="form-control">
+                            <option value="proposta">Proposta</option>
+                            <option value="plano">Plano de trabalho</option>
+                            <option value="orcamento">Orçamento</option>
+                            <option value="relatorio">Relatório</option>
+                            <option value="anexo">Anexo</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">Anexar</button>
+                </div>
+                @error('arquivo')
+                    <div class="field-error" style="margin-top:6px;">{{ $message }}</div>
+                @enderror
+            </form>
+
+        </div>
+    </div>
+
 </div>
 
 {{-- Lateral --}}

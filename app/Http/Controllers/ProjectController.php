@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Edital;
 use App\Models\Institution;
 use App\Models\Project;
+use App\Models\ProjectAttachment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class ProjectController extends Controller
 {
@@ -98,8 +100,52 @@ class ProjectController extends Controller
 
     public function show(Project $project)
     {
-        $project->load('edital');
+        $project->load('edital', 'attachments');
         return view('projects.show', compact('project'));
+    }
+
+    public function storeAttachment(Request $request, Project $project)
+    {
+        $request->validate([
+            'arquivo' => 'required|file|max:20480|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png',
+            'tipo'    => 'nullable|in:proposta,plano,orcamento,relatorio,anexo',
+        ], [
+            'arquivo.max'   => 'O arquivo deve ter no máximo 20 MB.',
+            'arquivo.mimes' => 'Formatos aceitos: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG.',
+        ]);
+
+        $file = $request->file('arquivo');
+        $path = $file->store("projects/{$project->id}", 'local');
+
+        $project->attachments()->create([
+            'nome'        => $file->getClientOriginalName(),
+            'arquivo_path'=> $path,
+            'mime_type'   => $file->getMimeType(),
+            'file_size'   => $file->getSize(),
+            'tipo'        => $request->input('tipo', 'proposta'),
+        ]);
+
+        return redirect()->route('projects.show', $project)
+            ->with('success', 'Arquivo anexado com sucesso.');
+    }
+
+    public function downloadAttachment(Project $project, ProjectAttachment $attachment)
+    {
+        abort_unless($attachment->project_id === $project->id, 404);
+        abort_unless(Storage::disk('local')->exists($attachment->arquivo_path), 404);
+
+        return Storage::disk('local')->download($attachment->arquivo_path, $attachment->nome);
+    }
+
+    public function destroyAttachment(Project $project, ProjectAttachment $attachment)
+    {
+        abort_unless($attachment->project_id === $project->id, 404);
+
+        Storage::disk('local')->delete($attachment->arquivo_path);
+        $attachment->delete();
+
+        return redirect()->route('projects.show', $project)
+            ->with('success', 'Anexo removido.');
     }
 
     public function edit(Project $project)

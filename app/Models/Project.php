@@ -36,6 +36,11 @@ class Project extends Model
         return $this->belongsTo(Edital::class);
     }
 
+    public function attachments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProjectAttachment::class)->latest();
+    }
+
     public function getStatusLabelAttribute(): string
     {
         return match($this->status) {
