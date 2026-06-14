@@ -76,15 +76,12 @@
                         $statusClass = match($doc->status) {
                             'valido'         => 'badge-valido',
                             'vence_em_breve' => 'badge-em-breve',
+                            'vence_urgente'  => 'badge-urgente',
+                            'vence_critico'  => 'badge-critico',
                             'vencido'        => 'badge-vencido',
                             default          => 'badge-faltante',
                         };
-                        $sLabel = match($doc->status) {
-                            'valido'         => 'Válido',
-                            'vence_em_breve' => 'Vencendo',
-                            'vencido'        => 'Vencido',
-                            default          => 'Sem validade',
-                        };
+                        $sLabel = $doc->statusLabel;
                         $catLabel = match($doc->documentType->category) {
                             'juridico'  => 'Jurídico',
                             'federal'   => 'Federal',

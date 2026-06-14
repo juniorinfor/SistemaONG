@@ -224,13 +224,13 @@
         $hasCurrent = $currentDocs->has($type->id);
         $currentDoc = $type->currentDocument->first();
         $isExpired  = $hasCurrent && $currentDoc && $currentDoc->expires_at && $currentDoc->expires_at->isPast();
-        $warnDate   = now()->addDays(30);
+        $warnDate   = now()->addDays(10);
         $isSoon     = $hasCurrent && $currentDoc && $currentDoc->expires_at
                         && !$currentDoc->expires_at->isPast()
                         && $currentDoc->expires_at->lte($warnDate);
 
         $statusClass = !$hasCurrent ? 'miss' : ($isExpired ? 'exp' : 'ok');
-        $statusLabel = !$hasCurrent ? 'Faltando' : ($isExpired ? 'Vencido' : ($isSoon ? 'Vence em breve' : 'OK'));
+        $statusLabel = !$hasCurrent ? 'Faltando' : ($isExpired ? 'Vencido' : ($isSoon ? $currentDoc->statusLabel : 'OK'));
     @endphp
     <div class="doc-type-row"
          data-name="{{ strtolower($type->name) }}"

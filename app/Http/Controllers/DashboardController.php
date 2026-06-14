@@ -15,15 +15,15 @@ class DashboardController extends Controller
 
         $total   = Document::where('institution_id', $iid)->where('is_current', true)->count();
         $validos = Document::where('institution_id', $iid)->where('is_current', true)
-            ->where(fn($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>=', now()->addDays(30)))
+            ->where(fn($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>=', now()->addDays(10)))
             ->count();
-        $breve   = Document::where('institution_id', $iid)->where('is_current', true)->expiringSoon(30)->count();
+        $breve   = Document::where('institution_id', $iid)->where('is_current', true)->expiringSoon(10)->count();
         $vencidos = Document::where('institution_id', $iid)->where('is_current', true)
             ->where('expires_at', '<', now())->count();
 
         $expiring = Document::where('institution_id', $iid)
             ->where('is_current', true)
-            ->expiringSoon(30)
+            ->expiringSoon(10)
             ->with('documentType')
             ->orderBy('expires_at')
             ->take(8)

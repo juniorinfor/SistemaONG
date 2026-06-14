@@ -215,8 +215,14 @@
         .badge-em-breve    { background: var(--amarelo-light); color: #8a5e00; }
         .badge-em-breve .badge-dot { background: var(--amarelo); }
 
-        .badge-vencido     { background: #fdecea; color: #b71c1c; }
-        .badge-vencido .badge-dot { background: #e53935; }
+        .badge-urgente     { background: #fff0e0; color: #b84d00; }
+        .badge-urgente .badge-dot { background: #f57c00; }
+
+        .badge-critico     { background: #fdecea; color: #b71c1c; }
+        .badge-critico .badge-dot { background: #e53935; }
+
+        .badge-vencido     { background: #f3e5f5; color: #6a1b9a; }
+        .badge-vencido .badge-dot { background: #9c27b0; }
 
         .badge-faltante    { background: #f4f4f4; color: #888; }
         .badge-faltante .badge-dot { background: #bbb; }
@@ -407,7 +413,7 @@
             <a href="{{ route('documents.index') }}" class="nav-item {{ request()->routeIs('documents.*') ? 'active' : '' }}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
                 Documentos
-                @php $expiring = \App\Models\Document::where('is_current',true)->expiringSoon(30)->count(); @endphp
+                @php $expiring = \App\Models\Document::where('is_current',true)->expiringSoon(10)->count(); @endphp
                 @if($expiring > 0)<span class="nav-badge">{{ $expiring }}</span>@endif
             </a>
 

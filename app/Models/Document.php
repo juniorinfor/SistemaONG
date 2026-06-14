@@ -51,47 +51,53 @@ class Document extends Model
         return $this->hasMany(NotificationLog::class);
     }
 
-    // Status calculado: valido | vence_em_breve | vencido | sem_validade
+    // Status: valido | vence_em_breve (≤10d) | vence_urgente (≤5d) | vence_critico (≤1d) | vencido | sem_validade
     public function getStatusAttribute(): string
     {
         if (is_null($this->expires_at)) {
             return 'sem_validade';
         }
 
-        $today    = Carbon::today();
-        $warnDays = config('documents.warn_days_before_expiry', 30);
-        $warnDate = $today->copy()->addDays($warnDays);
+        $today = Carbon::today();
 
         if ($this->expires_at->lt($today)) {
             return 'vencido';
         }
 
-        if ($this->expires_at->lte($warnDate)) {
-            return 'vence_em_breve';
-        }
+        $dias = (int) $today->diffInDays($this->expires_at);
+
+        if ($dias <= 1)  return 'vence_critico';
+        if ($dias <= 5)  return 'vence_urgente';
+        if ($dias <= 10) return 'vence_em_breve';
 
         return 'valido';
     }
 
     public function getStatusLabelAttribute(): string
     {
+        $dias = $this->expires_at ? (int) Carbon::today()->diffInDays($this->expires_at) : null;
+
         return match($this->status) {
-            'valido'        => 'Válido',
-            'vence_em_breve'=> 'Vence em breve',
-            'vencido'       => 'Vencido',
-            'sem_validade'  => 'Sem vencimento',
-            default         => '—',
+            'valido'         => 'Válido',
+            'vence_em_breve' => "Vence em {$dias}d",
+            'vence_urgente'  => "Vence em {$dias}d",
+            'vence_critico'  => $dias === 0 ? 'Vence hoje' : 'Vence amanhã',
+            'vencido'        => 'Vencido',
+            'sem_validade'   => 'Sem vencimento',
+            default          => '—',
         };
     }
 
     public function getStatusColorAttribute(): string
     {
         return match($this->status) {
-            'valido'        => 'green',
-            'vence_em_breve'=> 'yellow',
-            'vencido'       => 'red',
-            'sem_validade'  => 'gray',
-            default         => 'gray',
+            'valido'         => 'green',
+            'vence_em_breve' => 'yellow',
+            'vence_urgente'  => 'orange',
+            'vence_critico'  => 'red',
+            'vencido'        => 'red',
+            'sem_validade'   => 'gray',
+            default          => 'gray',
         };
     }
 
@@ -105,7 +111,7 @@ class Document extends Model
         return $query->where('is_public', true);
     }
 
-    public function scopeExpiringSoon($query, int $days = 30)
+    public function scopeExpiringSoon($query, int $days = 10)
     {
         return $query->whereBetween('expires_at', [now(), now()->addDays($days)]);
     }

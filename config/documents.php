@@ -5,12 +5,12 @@ return [
      * Quantos dias antes do vencimento o sistema classifica como "vence em breve"
      * e começa a enviar alertas.
      */
-    'warn_days_before_expiry' => 30,
+    'warn_days_before_expiry' => 10,
 
     /*
      * Marcos de alerta por e-mail (dias antes do vencimento).
      */
-    'alert_thresholds' => [30, 10, 1],
+    'alert_thresholds' => [10, 5, 1],
 
     /*
      * Tamanho máximo de upload em KB (10 MB padrão).

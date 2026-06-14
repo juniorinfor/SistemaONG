@@ -9,15 +9,12 @@
     $statusClass = match($document->status) {
         'valido'         => 'badge-valido',
         'vence_em_breve' => 'badge-em-breve',
+        'vence_urgente'  => 'badge-urgente',
+        'vence_critico'  => 'badge-critico',
         'vencido'        => 'badge-vencido',
         default          => 'badge-faltante',
     };
-    $sLabel = match($document->status) {
-        'valido'         => 'Válido',
-        'vence_em_breve' => 'Vencendo em breve',
-        'vencido'        => 'Vencido',
-        default          => 'Sem validade',
-    };
+    $sLabel = $document->statusLabel;
 @endphp
 
 <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;max-width:1000px;">
