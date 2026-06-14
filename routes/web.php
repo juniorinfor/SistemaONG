@@ -29,7 +29,8 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('people',         PersonController::class);
     Route::resource('checklists',     ChecklistController::class);
 
-    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+    Route::get('/settings',   [SettingsController::class, 'index'])->name('settings.index');
+    Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');
 
     // Radar de Editais
     Route::get('/editais/sync', [EditalController::class, 'syncNow'])->name('editais.sync');
