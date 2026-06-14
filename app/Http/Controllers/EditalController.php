@@ -193,8 +193,8 @@ class EditalController extends Controller
         }
 
         // Documentos atuais da instituição (apenas nomes — mínimo de tokens)
-        $docsDisponiveis = Document::where('institution_id', $institution->id)
-            ->where('is_current', true)
+        $docsDisponiveis = Document::where('documents.institution_id', $institution->id)
+            ->where('documents.is_current', true)
             ->join('document_types', 'documents.document_type_id', '=', 'document_types.id')
             ->pluck('document_types.name')
             ->toArray();
