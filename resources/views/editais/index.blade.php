@@ -144,8 +144,8 @@
 @php
     $ps = $edital->prazo_status;
     $prazoLabel = match($ps) {
-        'urgente'   => ($edital->prazo_inscricao ? $edital->prazo_inscricao->diffInDays(now()) . 'd' : '!'),
-        'breve'     => ($edital->prazo_inscricao ? $edital->prazo_inscricao->diffInDays(now()) . 'd' : '~'),
+        'urgente'   => ($edital->prazo_inscricao ? (int) now()->diffInDays($edital->prazo_inscricao) . 'd' : '!'),
+        'breve'     => ($edital->prazo_inscricao ? (int) now()->diffInDays($edital->prazo_inscricao) . 'd' : '~'),
         'ok'        => $edital->prazo_inscricao?->format('d/m'),
         'encerrado' => 'Enc.',
         default     => '—',

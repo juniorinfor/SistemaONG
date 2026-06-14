@@ -224,9 +224,10 @@
         $hasCurrent = $currentDocs->has($type->id);
         $currentDoc = $type->currentDocument->first();
         $isExpired  = $hasCurrent && $currentDoc && $currentDoc->expires_at && $currentDoc->expires_at->isPast();
+        $warnDate   = now()->addDays(30);
         $isSoon     = $hasCurrent && $currentDoc && $currentDoc->expires_at
                         && !$currentDoc->expires_at->isPast()
-                        && $currentDoc->expires_at->diffInDays(now()) <= 30;
+                        && $currentDoc->expires_at->lte($warnDate);
 
         $statusClass = !$hasCurrent ? 'miss' : ($isExpired ? 'exp' : 'ok');
         $statusLabel = !$hasCurrent ? 'Faltando' : ($isExpired ? 'Vencido' : ($isSoon ? 'Vence em breve' : 'OK'));

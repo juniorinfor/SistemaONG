@@ -113,7 +113,7 @@
                             @if($doc->expires_at)
                                 {{ $doc->expires_at->format('d/m/Y') }}
                                 @if($doc->status === 'vence_em_breve')
-                                    <div style="font-size:11px;color:var(--amarelo);">em {{ now()->diffInDays($doc->expires_at) }}d</div>
+                                    <div style="font-size:11px;color:var(--amarelo);">em {{ (int) now()->diffInDays($doc->expires_at) }}d</div>
                                 @elseif($doc->status === 'vencido')
                                     <div style="font-size:11px;color:#e53935;">{{ $doc->expires_at->diffForHumans() }}</div>
                                 @endif
