@@ -6,6 +6,7 @@ use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\DocumentTypeController;
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\ChecklistController;
+use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\TransparencyController;
 use App\Http\Controllers\EditalController;
@@ -28,6 +29,8 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('document-types', DocumentTypeController::class);
     Route::resource('people',         PersonController::class);
     Route::resource('checklists',     ChecklistController::class);
+
+    Route::resource('projects', ProjectController::class);
 
     Route::get('/settings',   [SettingsController::class, 'index'])->name('settings.index');
     Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');

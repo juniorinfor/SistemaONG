@@ -428,6 +428,11 @@
                 Radar de Editais
             </a>
 
+            <a href="{{ route('projects.index') }}" class="nav-item {{ request()->routeIs('projects.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                Projetos
+            </a>
+
             <div class="nav-section-label">Sistema</div>
 
             <a href="{{ route('document-types.index') }}" class="nav-item {{ request()->routeIs('document-types.*') ? 'active' : '' }}">
