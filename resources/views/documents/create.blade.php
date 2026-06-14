@@ -5,8 +5,9 @@
 
 @section('content')
 
-<div style="max-width:720px;">
+<div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:flex-start;max-width:1100px;">
 
+{{-- Coluna principal: formulário --}}
 <div class="card">
     <div class="card-header">
         <span class="card-title">Dados do documento</span>
@@ -51,24 +52,6 @@
                 @error('document_type_id')
                     <div class="field-error">{{ $message }}</div>
                 @enderror
-            </div>
-
-            {{-- Painel de instruções (aparece ao selecionar tipo) --}}
-            <div id="type-info" style="display:none;background:#f0faf7;border:1px solid #b2dfdb;border-radius:10px;padding:16px 18px;margin-bottom:20px;">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
-                    <div style="flex:1;min-width:0;">
-                        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#00897b;margin-bottom:6px;">
-                            Sobre este documento
-                        </div>
-                        <div id="type-instructions" style="font-size:13px;color:var(--texto);line-height:1.6;white-space:pre-wrap;"></div>
-                    </div>
-                </div>
-                <div id="type-url-wrap" style="display:none;margin-top:12px;padding-top:10px;border-top:1px solid #b2dfdb;">
-                    <a id="type-url" href="#" target="_blank"
-                       style="font-size:12px;color:#00897b;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
-                        ↗ Acessar site oficial para obter o documento
-                    </a>
-                </div>
             </div>
 
             {{-- Pessoa (opcional) --}}
@@ -148,6 +131,25 @@
             </div>
         </form>
 
+    </div>
+</div>
+
+{{-- Coluna lateral: painel informativo --}}
+<div id="type-info" style="display:none;position:sticky;top:24px;">
+    <div style="background:#f0faf7;border:1px solid #b2dfdb;border-radius:12px;padding:20px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#00897b;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;flex-shrink:0;">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            Sobre este documento
+        </div>
+        <div id="type-instructions" style="font-size:13px;color:var(--texto);line-height:1.7;white-space:pre-wrap;"></div>
+        <div id="type-url-wrap" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid #b2dfdb;">
+            <a id="type-url" href="#" target="_blank"
+               style="font-size:12px;color:#00897b;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
+                ↗ Acessar site oficial para obter o documento
+            </a>
+        </div>
     </div>
 </div>
 
