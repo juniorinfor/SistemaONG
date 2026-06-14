@@ -20,6 +20,7 @@ class EditalSyncService
         $results = [];
         $results['transferegov'] = $this->syncTransferegov($institution, $limit);
         $results['iati']         = $this->syncIati($institution, $limit);
+        $results['dportal']      = $this->syncDPortal($institution, $limit);
         return $results;
     }
 
@@ -158,6 +159,75 @@ class EditalSyncService
 
         } catch (\Throwable $e) {
             Log::error('IATI sync error', ['message' => $e->getMessage()]);
+            return 0;
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // FONTE 3: D-Portal (espelho IATI — público, sem autenticação)
+    // ---------------------------------------------------------------
+    public function syncDPortal(Institution $institution, ?int $limit = null): int
+    {
+        try {
+            $response = Http::timeout(30)
+                ->withHeaders(['Accept' => 'application/json'])
+                ->get('https://d-portal.org/q.json', [
+                    'form'                  => 'act',
+                    'recipient_country_code' => 'BR',
+                    'status'                => '2',
+                    'limit'                 => $limit ?? 50,
+                    'fields'                => 'aid,titles,activity_dates,budgets,descriptions',
+                ]);
+
+            if ($response->failed()) {
+                Log::warning('D-Portal API failed', ['status' => $response->status()]);
+                return 0;
+            }
+
+            $items = $response->json('rows', []);
+            $count = 0;
+
+            foreach ($items as $item) {
+                $aid     = $item['aid'] ?? md5(json_encode($item));
+                $fonteId = 'iati_' . $aid;
+
+                if (Edital::where('fonte', 'iati')->where('fonte_id', $fonteId)->exists()) {
+                    continue;
+                }
+
+                $titulo    = $item['title'] ?? '';
+                $descricao = $item['description'] ?? '';
+                if (empty($titulo)) continue;
+
+                $extracted = [];
+                if (!$limit) {
+                    $extracted = $this->claude->extrairEdital($titulo . "\n" . $descricao, 'en');
+                    if (isset($extracted['error'])) $extracted = [];
+                }
+
+                Edital::create([
+                    'institution_id'  => $institution->id,
+                    'titulo'          => $extracted['titulo'] ?? $titulo,
+                    'area'            => $extracted['area'] ?? null,
+                    'fonte'           => 'iati',
+                    'fonte_id'        => $fonteId,
+                    'link_oficial'    => "https://d-portal.org/ctrack.html#view=act&aid={$aid}",
+                    'valor_min'       => null,
+                    'valor_max'       => $extracted['valor_max'] ?? null,
+                    'prazo_inscricao' => $extracted['prazo_inscricao'] ?? null,
+                    'resumo'          => $extracted['resumo'] ?? ($limit ? '[amostra]' : mb_substr($descricao, 0, 300)),
+                    'criterios'       => $extracted['criterios'] ?? null,
+                    'status'          => 'aberto',
+                    'synced_at'       => now(),
+                ]);
+
+                $count++;
+            }
+
+            return $count;
+
+        } catch (\Throwable $e) {
+            Log::error('D-Portal sync error', ['message' => $e->getMessage()]);
             return 0;
         }
     }
