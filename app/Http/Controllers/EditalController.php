@@ -182,6 +182,84 @@ class EditalController extends Controller
     }
 
     // ---------------------------------------------------------------
+    // Analisar edital a partir de arquivo (PDF/imagem) via IA
+    // ---------------------------------------------------------------
+    public function analisarForm()
+    {
+        return view('editais.analisar');
+    }
+
+    public function analisar(Request $request)
+    {
+        $request->validate([
+            'arquivo' => 'required|file|max:20480|mimes:pdf,jpg,jpeg,png',
+        ], [
+            'arquivo.required' => 'Envie o arquivo do edital.',
+            'arquivo.max'      => 'O arquivo deve ter no máximo 20 MB.',
+            'arquivo.mimes'    => 'Envie o edital em PDF ou imagem (JPG, PNG).',
+        ]);
+
+        $institution = $this->institution();
+        $file = $request->file('arquivo');
+        $path = $file->store("editais/uploads/{$institution->id}", 'local');
+        $absolute = Storage::disk('local')->path($path);
+
+        // 1. Extrai os dados do edital com a visão do Claude
+        $dados = $this->claude->extrairEditalDeArquivo($absolute, $file->getMimeType());
+
+        if (isset($dados['error'])) {
+            Storage::disk('local')->delete($path);
+            return back()->with('error', 'Não foi possível analisar o edital: ' . $dados['error']);
+        }
+
+        // 2. Cria o edital com os dados extraídos
+        $sanitizarData = fn($d) => (is_string($d) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) ? $d : null;
+
+        $edital = Edital::create([
+            'institution_id'  => $institution->id,
+            'titulo'          => $dados['titulo'] ?? $file->getClientOriginalName(),
+            'area'            => $dados['area'] ?? null,
+            'fonte'           => 'upload',
+            'valor_min'       => is_numeric($dados['valor_min'] ?? null) ? $dados['valor_min'] : null,
+            'valor_max'       => is_numeric($dados['valor_max'] ?? null) ? $dados['valor_max'] : null,
+            'prazo_inscricao' => $sanitizarData($dados['prazo_inscricao'] ?? null),
+            'prazo_execucao'  => $sanitizarData($dados['prazo_execucao'] ?? null),
+            'resumo'          => $dados['resumo'] ?? null,
+            'criterios'       => $dados['criterios'] ?? null,
+            'status'          => 'aberto',
+            'synced_at'       => now(),
+        ]);
+
+        // 3. Guarda o arquivo enviado como anexo do edital
+        EditalAttachment::create([
+            'edital_id'    => $edital->id,
+            'nome'         => $file->getClientOriginalName(),
+            'arquivo_path' => $path,
+            'tipo'         => 'edital',
+        ]);
+
+        // 4. Roda a compatibilidade documental automaticamente
+        if ($edital->criterios) {
+            $docs = Document::where('documents.institution_id', $institution->id)
+                ->where('documents.is_current', true)
+                ->join('document_types', 'documents.document_type_id', '=', 'document_types.id')
+                ->pluck('document_types.name')
+                ->toArray();
+
+            $result = $this->claude->verificarCompatibilidade($edital->criterios, $docs);
+            if (!isset($result['error'])) {
+                $edital->update([
+                    'compatibility_score'   => $result['score'] ?? null,
+                    'compatibility_details' => $result,
+                ]);
+            }
+        }
+
+        return redirect()->route('editais.show', $edital)
+            ->with('success', 'Edital analisado com sucesso! Veja a compatibilidade documental ao lado.');
+    }
+
+    // ---------------------------------------------------------------
     // Verificar compatibilidade via IA
     // ---------------------------------------------------------------
     public function checkCompatibility(Edital $edital)

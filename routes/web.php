@@ -40,6 +40,8 @@ Route::middleware(['auth'])->group(function () {
 
     // Radar de Editais
     Route::get('/editais/sync', [EditalController::class, 'syncNow'])->name('editais.sync');
+    Route::get('/editais/analisar',  [EditalController::class, 'analisarForm'])->name('editais.analisar');
+    Route::post('/editais/analisar', [EditalController::class, 'analisar'])->name('editais.analisar.store');
     Route::post('/editais/{edital}/compatibility', [EditalController::class, 'checkCompatibility'])->name('editais.compatibility');
     Route::get('/editais/{attachment}/download', [EditalController::class, 'downloadAttachment'])->name('editais.attachment.download');
     Route::resource('editais', EditalController::class)

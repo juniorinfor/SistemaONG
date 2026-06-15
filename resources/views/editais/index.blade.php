@@ -98,6 +98,7 @@
     </div>
     <div style="display:flex;gap:8px;">
         <a href="{{ route('editais.create') }}" class="btn btn-ghost btn-sm">+ Cadastrar manualmente</a>
+        <a href="{{ route('editais.analisar') }}" class="btn btn-ghost btn-sm">🔍 Analisar edital (IA)</a>
         <a href="{{ route('editais.sync') }}"
            onclick="this.innerHTML='Buscando...'; this.style.opacity='.7'; this.style.pointerEvents='none';"
            class="btn btn-primary btn-sm">

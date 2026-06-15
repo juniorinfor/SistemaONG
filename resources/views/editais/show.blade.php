@@ -45,6 +45,7 @@
         'transferegov' => 'Transferegov (Gov Federal)',
         'iati'         => 'IATI (Internacional)',
         'dou'          => 'Diário Oficial da União',
+        'upload'       => 'Edital enviado (análise por IA)',
         default        => 'Cadastro Manual',
     };
 @endphp

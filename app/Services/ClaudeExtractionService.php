@@ -49,6 +49,51 @@ PROMPT;
     }
 
     /**
+     * Extrai campos de um EDITAL EM ARQUIVO (PDF ou imagem) usando a visão nativa do Claude.
+     * Não exige biblioteca de parser no servidor — envia o arquivo como bloco document/image.
+     */
+    public function extrairEditalDeArquivo(string $absolutePath, string $mimeType): array
+    {
+        if (!is_file($absolutePath)) {
+            return ['error' => 'Arquivo não encontrado para análise'];
+        }
+
+        $data = base64_encode(file_get_contents($absolutePath));
+
+        $prompt = <<<PROMPT
+O documento anexado é um edital/chamada pública para ONGs. Extraia as informações em JSON.
+Se estiver em outro idioma, traduza "resumo" e "criterios" para português brasileiro.
+Responda APENAS com JSON válido, sem markdown, sem explicações.
+
+Formato esperado:
+{
+  "titulo": "string — título completo do edital",
+  "area": "string — área temática (assistência social, educação, saúde, cultura, meio ambiente, criança e adolescente, mulher, habitação, esporte, outro)",
+  "valor_min": number ou null,
+  "valor_max": number ou null,
+  "prazo_inscricao": "YYYY-MM-DD" ou null,
+  "prazo_execucao": "YYYY-MM-DD" ou null,
+  "resumo": "string — resumo em português de até 400 caracteres",
+  "criterios": "string — lista dos requisitos/documentos exigidos para habilitação, um por linha separados por \\n"
+}
+PROMPT;
+
+        if (str_contains($mimeType, 'pdf')) {
+            $bloco = [
+                'type'   => 'document',
+                'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => $data],
+            ];
+        } else {
+            $bloco = [
+                'type'   => 'image',
+                'source' => ['type' => 'base64', 'media_type' => $mimeType, 'data' => $data],
+            ];
+        }
+
+        return $this->callWithContent([$bloco, ['type' => 'text', 'text' => $prompt]], 1500, 90);
+    }
+
+    /**
      * Verifica compatibilidade entre os critérios do edital e os documentos da instituição.
      * Usa apenas o campo "criterios" (já armazenado) + lista de tipos de documentos.
      * Estimativa: ~600 tokens por chamada.
@@ -80,6 +125,15 @@ PROMPT;
 
     private function call(string $prompt): array
     {
+        return $this->callWithContent($prompt, 800, 30);
+    }
+
+    /**
+     * Chamada genérica à API. $content pode ser string (texto simples)
+     * ou array de blocos (texto + document/image).
+     */
+    private function callWithContent(string|array $content, int $maxTokens = 800, int $timeout = 30): array
+    {
         if (empty($this->apiKey)) {
             return ['error' => 'ANTHROPIC_API_KEY não configurada'];
         }
@@ -89,11 +143,11 @@ PROMPT;
                 'x-api-key'         => $this->apiKey,
                 'anthropic-version' => '2023-06-01',
                 'content-type'      => 'application/json',
-            ])->timeout(30)->post($this->baseUrl, [
+            ])->timeout($timeout)->post($this->baseUrl, [
                 'model'      => $this->model,
-                'max_tokens' => 800,
+                'max_tokens' => $maxTokens,
                 'messages'   => [
-                    ['role' => 'user', 'content' => $prompt],
+                    ['role' => 'user', 'content' => $content],
                 ],
             ]);
 
