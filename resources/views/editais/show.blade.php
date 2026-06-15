@@ -165,11 +165,18 @@
                                 <strong>Ajustar:</strong> {{ $s['ajustes'] }}
                             </p>
                         @endif
-                        <div style="display:flex;gap:6px;">
+                        <div style="display:flex;gap:6px;align-items:center;">
                             @if(!empty($s['project_id']))
-                                <a href="{{ route('projects.show', $s['project_id']) }}" class="btn btn-ghost btn-sm" style="font-size:11px;">Ver projeto</a>
+                                <a href="{{ route('projects.show', $s['project_id']) }}" class="btn btn-ghost btn-sm" style="font-size:11px;">Ver base</a>
                             @endif
-                            <a href="{{ route('projects.create', ['edital_id' => $edital->id]) }}" class="btn btn-primary btn-sm" style="font-size:11px;">Gerar projeto para o edital</a>
+                            <form method="POST" action="{{ route('editais.gerar-projeto', $edital) }}" style="display:inline;">
+                                @csrf
+                                <input type="hidden" name="project_id" value="{{ $s['project_id'] ?? '' }}">
+                                <button type="submit" class="btn btn-primary btn-sm" style="font-size:11px;"
+                                        onclick="this.innerHTML='⏳ Gerando projeto...';this.form.style.pointerEvents='none';">
+                                    ✨ Gerar projeto com IA
+                                </button>
+                            </form>
                         </div>
                     </div>
                     @endforeach

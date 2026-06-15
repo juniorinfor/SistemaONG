@@ -334,6 +334,58 @@ class EditalController extends Controller
     }
 
     // ---------------------------------------------------------------
+    // Gerar projeto completo no formato do edital (Fase 3)
+    // ---------------------------------------------------------------
+    public function gerarProjeto(Request $request, Edital $edital)
+    {
+        $institution = $this->institution();
+
+        $base = null;
+        if ($request->filled('project_id')) {
+            $base = \App\Models\Project::where('institution_id', $institution->id)
+                ->find($request->project_id);
+        }
+
+        $projetoBase = [
+            'titulo'    => $base->title ?? ($edital->titulo . ' — projeto'),
+            'area'      => $base->area ?? $edital->area,
+            'descricao' => $base->description ?? '',
+        ];
+
+        $dados = $this->claude->gerarProjeto([
+            'titulo'    => $edital->titulo,
+            'area'      => $edital->area,
+            'valor'     => $edital->valor_formatado,
+            'resumo'    => $edital->resumo,
+            'criterios' => $edital->criterios,
+        ], $projetoBase);
+
+        if (isset($dados['error'])) {
+            return back()->with('error', 'Erro ao gerar o projeto: ' . $dados['error']);
+        }
+
+        // Monta as observações com justificativa, metas e contrapartidas
+        $notes = '';
+        if (!empty($dados['justificativa'])) $notes .= "JUSTIFICATIVA\n{$dados['justificativa']}\n\n";
+        if (!empty($dados['metas']))         $notes .= "METAS E INDICADORES\n{$dados['metas']}\n\n";
+        if (!empty($dados['contrapartidas']))$notes .= "CONTRAPARTIDAS E SUSTENTABILIDADE\n{$dados['contrapartidas']}";
+
+        $project = \App\Models\Project::create([
+            'institution_id'  => $institution->id,
+            'edital_id'       => $edital->id,
+            'title'           => $dados['titulo'] ?? $projetoBase['titulo'],
+            'area'            => $dados['area'] ?? $edital->area,
+            'status'          => 'em_elaboracao',
+            'valor_pleiteado' => is_numeric($dados['valor_pleiteado'] ?? null) ? $dados['valor_pleiteado'] : null,
+            'description'     => $dados['objeto'] ?? null,
+            'notes'           => trim($notes) ?: null,
+        ]);
+
+        return redirect()->route('projects.show', $project)
+            ->with('success', 'Projeto gerado pela IA e vinculado ao edital. Revise e ajuste antes de submeter.');
+    }
+
+    // ---------------------------------------------------------------
     // Download de anexo
     // ---------------------------------------------------------------
     public function downloadAttachment(EditalAttachment $attachment)

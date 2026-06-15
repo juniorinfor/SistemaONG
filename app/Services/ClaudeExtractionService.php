@@ -169,6 +169,50 @@ PROMPT;
         return $this->call($prompt);
     }
 
+    /**
+     * Gera um projeto social COMPLETO adaptado ao edital, partindo de um projeto do portfólio.
+     * Usa um modelo mais forte (Sonnet) para qualidade de texto na proposta final.
+     */
+    public function gerarProjeto(array $edital, array $projetoBase): array
+    {
+        $editalTxt = "TÍTULO: " . ($edital['titulo'] ?? '—') . "\n"
+            . "ÁREA: " . ($edital['area'] ?? '—') . "\n"
+            . "VALOR DISPONÍVEL: " . ($edital['valor'] ?? '—') . "\n"
+            . "RESUMO: " . ($edital['resumo'] ?? '—') . "\n"
+            . "CRITÉRIOS/EXIGÊNCIAS: " . mb_substr($edital['criterios'] ?? '—', 0, 1500);
+
+        $baseTxt = "TÍTULO: " . ($projetoBase['titulo'] ?? '—') . "\n"
+            . "ÁREA: " . ($projetoBase['area'] ?? '—') . "\n"
+            . "DESCRIÇÃO: " . mb_substr($projetoBase['descricao'] ?? '', 0, 1200);
+
+        $prompt = <<<PROMPT
+Você é um especialista em elaboração de projetos para captação de recursos de ONGs brasileiras,
+com domínio dos critérios de avaliação de bancas de editais (mérito, viabilidade, impacto social,
+democratização do acesso, contrapartidas e ações afirmativas).
+
+EDITAL ALVO:
+{$editalTxt}
+
+PROJETO-BASE DO PORTFÓLIO DA ONG (ponto de partida — mantenha o conceito, adapte ao edital):
+{$baseTxt}
+
+Gere um projeto completo adaptado às exigências e ao valor deste edital. O valor pleiteado deve caber
+na faixa do edital. Escreva em português brasileiro, com qualidade de proposta aprovável por banca.
+Responda APENAS com JSON válido, sem markdown:
+{
+  "titulo": "string — título do projeto adaptado ao edital",
+  "area": "string — área temática",
+  "valor_pleiteado": número — valor compatível com o edital,
+  "objeto": "string — descrição detalhada do objeto: o que será feito, para quem, onde, como (2 a 4 parágrafos)",
+  "justificativa": "string — justificativa com relevância social e alinhamento ao edital (1 a 2 parágrafos)",
+  "metas": "string — metas e indicadores mensuráveis, um por linha",
+  "contrapartidas": "string — contrapartidas da ONG e sustentabilidade do projeto"
+}
+PROMPT;
+
+        return $this->callWithContent($prompt, 2800, 120, 'claude-sonnet-4-6');
+    }
+
     private function call(string $prompt): array
     {
         return $this->callWithContent($prompt, 1200, 45);
@@ -178,7 +222,7 @@ PROMPT;
      * Chamada genérica à API. $content pode ser string (texto simples)
      * ou array de blocos (texto + document/image).
      */
-    private function callWithContent(string|array $content, int $maxTokens = 800, int $timeout = 30): array
+    private function callWithContent(string|array $content, int $maxTokens = 800, int $timeout = 30, ?string $model = null): array
     {
         if (empty($this->apiKey)) {
             return ['error' => 'ANTHROPIC_API_KEY não configurada'];
@@ -190,7 +234,7 @@ PROMPT;
                 'anthropic-version' => '2023-06-01',
                 'content-type'      => 'application/json',
             ])->timeout($timeout)->post($this->baseUrl, [
-                'model'      => $this->model,
+                'model'      => $model ?? $this->model,
                 'max_tokens' => $maxTokens,
                 'messages'   => [
                     ['role' => 'user', 'content' => $content],
