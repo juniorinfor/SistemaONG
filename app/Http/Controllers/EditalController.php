@@ -292,6 +292,48 @@ class EditalController extends Controller
     }
 
     // ---------------------------------------------------------------
+    // Sugerir 3 projetos do portfólio para este edital (Fase 2)
+    // ---------------------------------------------------------------
+    public function sugerirProjetos(Edital $edital)
+    {
+        $institution = $this->institution();
+
+        $projetos = \App\Models\Project::where('institution_id', $institution->id)
+            ->get(['id', 'title', 'area', 'description', 'valor_pleiteado'])
+            ->map(fn($p) => [
+                'id'        => $p->id,
+                'titulo'    => $p->title,
+                'area'      => $p->area ?? '—',
+                'valor'     => $p->valorPleiteadoFormatado ?? '—',
+                'descricao' => $p->description ?? '',
+            ])
+            ->toArray();
+
+        if (empty($projetos)) {
+            return back()->with('error', 'Cadastre projetos no módulo de Projetos antes de pedir sugestões.');
+        }
+
+        $result = $this->claude->sugerirProjetos([
+            'titulo'    => $edital->titulo,
+            'area'      => $edital->area,
+            'valor'     => $edital->valor_formatado,
+            'resumo'    => $edital->resumo,
+            'criterios' => $edital->criterios,
+        ], $projetos);
+
+        if (isset($result['error'])) {
+            return back()->with('error', 'Erro ao sugerir projetos: ' . $result['error']);
+        }
+
+        $edital->update([
+            'project_suggestions' => $result['sugestoes'] ?? [],
+            'suggestions_at'      => now(),
+        ]);
+
+        return back()->with('success', 'Sugestões de projetos geradas com base no seu portfólio.');
+    }
+
+    // ---------------------------------------------------------------
     // Download de anexo
     // ---------------------------------------------------------------
     public function downloadAttachment(EditalAttachment $attachment)

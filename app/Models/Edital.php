@@ -19,6 +19,7 @@ class Edital extends Model
         'link_oficial', 'valor_min', 'valor_max', 'prazo_inscricao',
         'prazo_execucao', 'resumo', 'criterios', 'raw_text',
         'compatibility_score', 'compatibility_details', 'status', 'synced_at',
+        'project_suggestions', 'suggestions_at',
     ];
 
     protected $casts = [
@@ -27,7 +28,9 @@ class Edital extends Model
         'prazo_inscricao'       => 'date',
         'prazo_execucao'        => 'date',
         'compatibility_details' => 'array',
+        'project_suggestions'   => 'array',
         'synced_at'             => 'datetime',
+        'suggestions_at'        => 'datetime',
     ];
 
     public function institution(): BelongsTo

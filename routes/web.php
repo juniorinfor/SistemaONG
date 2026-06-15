@@ -43,6 +43,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/editais/analisar',  [EditalController::class, 'analisarForm'])->name('editais.analisar');
     Route::post('/editais/analisar', [EditalController::class, 'analisar'])->name('editais.analisar.store');
     Route::post('/editais/{edital}/compatibility', [EditalController::class, 'checkCompatibility'])->name('editais.compatibility');
+    Route::post('/editais/{edital}/sugerir-projetos', [EditalController::class, 'sugerirProjetos'])->name('editais.sugerir');
     Route::get('/editais/{attachment}/download', [EditalController::class, 'downloadAttachment'])->name('editais.attachment.download');
     Route::resource('editais', EditalController::class)
         ->only(['index','show','create','store','destroy'])

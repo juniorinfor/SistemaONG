@@ -131,6 +131,72 @@
         </div>
         @endif
 
+        {{-- Projetos sugeridos (Fase 2) --}}
+        <div class="card" style="margin-bottom:16px;">
+            <div class="card-header">
+                <span class="card-title">Projetos sugeridos para este edital</span>
+                @if($edital->suggestions_at)
+                    <span style="font-size:11px;color:var(--cinza-light);">Gerado {{ $edital->suggestions_at->diffForHumans() }}</span>
+                @endif
+            </div>
+            <div class="card-body">
+                @php $sugestoes = $edital->project_suggestions ?? []; @endphp
+
+                @if(!empty($sugestoes))
+                    @foreach($sugestoes as $i => $s)
+                    @php
+                        $ad = (int) ($s['aderencia'] ?? 0);
+                        $cor = $ad >= 70 ? '#00897b' : ($ad >= 40 ? '#e65100' : '#c62828');
+                    @endphp
+                    <div style="padding:14px 0;{{ $i > 0 ? 'border-top:1px solid var(--cinza-borda);' : '' }}">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                            <span style="font-size:18px;">{{ $i === 0 ? '🎯' : '•' }}</span>
+                            <span style="font-size:14px;font-weight:600;color:var(--texto);flex:1;">{{ $s['titulo'] ?? 'Projeto' }}</span>
+                            <span style="font-size:13px;font-weight:700;color:{{ $cor }};">{{ $ad }}%</span>
+                        </div>
+                        <div style="height:5px;background:#eee;border-radius:4px;overflow:hidden;margin-bottom:8px;">
+                            <div style="height:100%;width:{{ $ad }}%;background:{{ $cor }};border-radius:4px;"></div>
+                        </div>
+                        @if(!empty($s['justificativa']))
+                            <p style="font-size:12.5px;color:var(--texto);line-height:1.5;margin-bottom:4px;">{{ $s['justificativa'] }}</p>
+                        @endif
+                        @if(!empty($s['ajustes']))
+                            <p style="font-size:12px;color:var(--cinza-light);line-height:1.5;margin-bottom:8px;">
+                                <strong>Ajustar:</strong> {{ $s['ajustes'] }}
+                            </p>
+                        @endif
+                        <div style="display:flex;gap:6px;">
+                            @if(!empty($s['project_id']))
+                                <a href="{{ route('projects.show', $s['project_id']) }}" class="btn btn-ghost btn-sm" style="font-size:11px;">Ver projeto</a>
+                            @endif
+                            <a href="{{ route('projects.create', ['edital_id' => $edital->id]) }}" class="btn btn-primary btn-sm" style="font-size:11px;">Gerar projeto para o edital</a>
+                        </div>
+                    </div>
+                    @endforeach
+
+                    <form method="POST" action="{{ route('editais.sugerir', $edital) }}" style="margin-top:12px;">
+                        @csrf
+                        <button class="btn btn-ghost btn-sm" type="submit"
+                                onclick="this.innerHTML='⏳ Analisando...';this.style.pointerEvents='none';">
+                            ↻ Gerar novas sugestões
+                        </button>
+                    </form>
+                @else
+                    <div style="text-align:center;color:var(--cinza-light);padding:12px 0;">
+                        <div style="font-size:28px;margin-bottom:8px;">💡</div>
+                        <p style="font-size:13px;margin-bottom:14px;">A IA analisa seu portfólio de projetos e sugere os 3 mais aderentes a este edital.</p>
+                        <form method="POST" action="{{ route('editais.sugerir', $edital) }}">
+                            @csrf
+                            <button class="btn btn-primary btn-sm" type="submit"
+                                    onclick="this.innerHTML='⏳ Analisando portfólio...';this.style.pointerEvents='none';">
+                                💡 Sugerir projetos para este edital
+                            </button>
+                        </form>
+                    </div>
+                @endif
+            </div>
+        </div>
+
         {{-- Anexos --}}
         @if($edital->attachments->count())
         <div class="card">

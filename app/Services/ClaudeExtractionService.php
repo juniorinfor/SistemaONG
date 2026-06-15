@@ -123,9 +123,55 @@ PROMPT;
         return $this->call($prompt);
     }
 
+    /**
+     * Sugere 3 projetos do portfólio da ONG ranqueados pela aderência ao edital.
+     * Não inventa do zero — usa os projetos já cadastrados.
+     */
+    public function sugerirProjetos(array $edital, array $projetos): array
+    {
+        $editalTxt = "TÍTULO: " . ($edital['titulo'] ?? '—') . "\n"
+            . "ÁREA: " . ($edital['area'] ?? '—') . "\n"
+            . "VALOR: " . ($edital['valor'] ?? '—') . "\n"
+            . "RESUMO: " . ($edital['resumo'] ?? '—') . "\n"
+            . "CRITÉRIOS: " . mb_substr($edital['criterios'] ?? '—', 0, 1200);
+
+        $portfolio = '';
+        foreach ($projetos as $p) {
+            $portfolio .= "ID {$p['id']} | {$p['titulo']} | área: {$p['area']} | faixa: {$p['valor']}\n"
+                . "  resumo: " . mb_substr($p['descricao'] ?? '', 0, 220) . "\n";
+        }
+
+        $prompt = <<<PROMPT
+Você é um consultor de captação de recursos para ONGs brasileiras.
+
+EDITAL EM ANÁLISE:
+{$editalTxt}
+
+PORTFÓLIO DE PROJETOS DA ONG (já cadastrados):
+{$portfolio}
+
+Selecione os 3 projetos do portfólio MAIS ADERENTES a este edital e ranqueie do mais ao menos aderente.
+Para cada um, avalie a aderência (0-100), explique por que combina e o que ajustar para encaixar no edital.
+Responda APENAS com JSON válido, sem markdown:
+{
+  "sugestoes": [
+    {
+      "project_id": número (ID do projeto do portfólio),
+      "titulo": "string — título do projeto",
+      "aderencia": número de 0 a 100,
+      "justificativa": "string curta — por que esse projeto combina com o edital",
+      "ajustes": "string curta — o que adaptar para encaixar nas exigências do edital"
+    }
+  ]
+}
+PROMPT;
+
+        return $this->call($prompt);
+    }
+
     private function call(string $prompt): array
     {
-        return $this->callWithContent($prompt, 800, 30);
+        return $this->callWithContent($prompt, 1200, 45);
     }
 
     /**
