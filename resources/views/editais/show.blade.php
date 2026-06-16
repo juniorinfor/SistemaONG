@@ -251,9 +251,37 @@
                         <div style="text-align:left;margin-bottom:16px;">
                             <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--cinza-light);margin-bottom:6px;">Documentos faltando</div>
                             @foreach($details['missing'] as $m)
-                                <div class="compat-item">
-                                    <span class="icon" style="color:#e53935;">✕</span>
-                                    <span>{{ $m }}</span>
+                                @php
+                                    // Tenta encontrar o tipo no catálogo por similaridade de nome
+                                    $match = $documentTypes->first(function($dt) use ($m) {
+                                        return stripos($dt->name, $m) !== false
+                                            || stripos($m, $dt->name) !== false;
+                                    });
+                                @endphp
+                                <div style="background:#fff8f8;border:1px solid #ffcdd2;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+                                    <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:{{ $match ? '8px' : '0' }};">
+                                        <span style="color:#e53935;flex-shrink:0;margin-top:1px;">✕</span>
+                                        <span style="font-size:13px;font-weight:600;color:var(--texto);">{{ $m }}</span>
+                                    </div>
+                                    @if($match)
+                                        @if($match->instructions)
+                                            <p style="font-size:11.5px;color:var(--cinza);line-height:1.5;margin:0 0 6px 20px;white-space:pre-line;">{{ $match->instructions }}</p>
+                                        @endif
+                                        <div style="display:flex;gap:6px;margin-left:20px;flex-wrap:wrap;">
+                                            @if($match->official_url)
+                                                <a href="{{ $match->official_url }}" target="_blank"
+                                                   style="font-size:11px;color:#00897b;font-weight:600;text-decoration:none;background:#e0f7f4;padding:3px 9px;border-radius:20px;">
+                                                    ↗ Obter documento
+                                                </a>
+                                            @endif
+                                            <a href="{{ route('documents.create') }}?type_id={{ $match->id }}"
+                                               style="font-size:11px;color:#1565c0;font-weight:600;text-decoration:none;background:#e3f2fd;padding:3px 9px;border-radius:20px;">
+                                                + Fazer upload
+                                            </a>
+                                        </div>
+                                    @else
+                                        <p style="font-size:11px;color:var(--cinza-light);margin:4px 0 0 20px;">Não encontrado no catálogo. <a href="{{ route('document-types.index') }}" style="color:var(--teal);">Adicionar ao catálogo →</a></p>
+                                    @endif
                                 </div>
                             @endforeach
                         </div>

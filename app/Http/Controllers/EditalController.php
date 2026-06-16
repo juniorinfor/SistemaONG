@@ -72,7 +72,11 @@ class EditalController extends Controller
     public function show(Edital $edital)
     {
         $edital->load('attachments');
-        return view('editais.show', compact('edital'));
+        $institution  = $this->institution();
+        $documentTypes = \App\Models\DocumentType::where('institution_id', $institution->id)
+            ->where('is_active', true)
+            ->get(['id', 'name', 'instructions', 'official_url', 'validity_days']);
+        return view('editais.show', compact('edital', 'documentTypes'));
     }
 
     // ---------------------------------------------------------------

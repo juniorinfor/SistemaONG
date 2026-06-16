@@ -95,11 +95,12 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
                 <div class="form-group">
                     <label class="form-label">Data de emissão</label>
-                    <input type="date" name="issued_at" class="form-control" value="{{ old('issued_at') }}">
+                    <input type="date" name="issued_at" id="issued-at" class="form-control"
+                           value="{{ old('issued_at', date('Y-m-d')) }}">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Data de vencimento</label>
-                    <input type="date" name="expires_at" class="form-control" value="{{ old('expires_at') }}">
+                    <label class="form-label">Data de vencimento <span id="validity-hint" style="font-size:10px;color:var(--cinza-light);font-weight:400;"></span></label>
+                    <input type="date" name="expires_at" id="expires-at" class="form-control" value="{{ old('expires_at') }}">
                     <p style="font-size:11px;color:var(--cinza-light);margin-top:4px;">Deixe em branco se não vence</p>
                 </div>
             </div>
@@ -186,8 +187,29 @@ const typeInfo      = document.getElementById('type-info');
 const typeInstr     = document.getElementById('type-instructions');
 const typeUrlWrap   = document.getElementById('type-url-wrap');
 const typeUrl       = document.getElementById('type-url');
-const issuedInput   = document.querySelector('input[name="issued_at"]');
-const expiresInput  = document.querySelector('input[name="expires_at"]');
+const issuedInput   = document.getElementById('issued-at');
+const expiresInput  = document.getElementById('expires-at');
+const validityHint  = document.getElementById('validity-hint');
+
+// Rastrea se o usuário editou manualmente a data de vencimento
+let expiryUserEdited = {{ old('expires_at') ? 'true' : 'false' }};
+expiresInput.addEventListener('input', () => { expiryUserEdited = true; });
+
+// Calcula data sem problema de fuso horário
+function addDays(dateStr, days) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(y, m - 1, d + days);
+    const yy = dt.getFullYear();
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getDate()).padStart(2, '0');
+    return `${yy}-${mm}-${dd}`;
+}
+
+function recalcExpiry(validity) {
+    if (validity > 0 && issuedInput.value && !expiryUserEdited) {
+        expiresInput.value = addDays(issuedInput.value, validity);
+    }
+}
 
 function updateTypeInfo() {
     const opt = typeSelect.options[typeSelect.selectedIndex];
@@ -200,34 +222,24 @@ function updateTypeInfo() {
     typeInstr.textContent = instructions || 'Sem instruções cadastradas para este tipo.';
     typeInfo.style.display = 'block';
 
-    if (url) {
-        typeUrl.href = url;
-        typeUrlWrap.style.display = 'block';
-    } else {
-        typeUrlWrap.style.display = 'none';
-    }
+    if (url) { typeUrl.href = url; typeUrlWrap.style.display = 'block'; }
+    else      { typeUrlWrap.style.display = 'none'; }
 
-    // Sugere vencimento automaticamente se issued_at preenchido e validity_days existe
-    if (validity > 0 && issuedInput.value && !expiresInput.value) {
-        const issued  = new Date(issuedInput.value);
-        issued.setDate(issued.getDate() + validity);
-        expiresInput.value = issued.toISOString().split('T')[0];
-    }
-    if (validity === 0) {
-        expiresInput.value = '';
-        expiresInput.placeholder = 'Sem vencimento';
+    if (validity > 0) {
+        validityHint.textContent = `(validade: ${validity} dias)`;
+        recalcExpiry(validity);
+    } else {
+        validityHint.textContent = '';
+        if (!expiryUserEdited) expiresInput.value = '';
     }
 }
 
 typeSelect.addEventListener('change', updateTypeInfo);
+
 issuedInput.addEventListener('change', () => {
     const opt      = typeSelect.options[typeSelect.selectedIndex];
     const validity = opt ? parseInt(opt.dataset.validity) || 0 : 0;
-    if (validity > 0 && issuedInput.value) {
-        const issued = new Date(issuedInput.value);
-        issued.setDate(issued.getDate() + validity);
-        expiresInput.value = issued.toISOString().split('T')[0];
-    }
+    recalcExpiry(validity);
 });
 
 // Inicializa se tipo já selecionado (ex: vindo do catálogo)

@@ -6,6 +6,21 @@
 
 @section('content')
 
+{{-- Atalho destaque: Analisar edital com IA --}}
+<div style="background:linear-gradient(135deg,#e0f7f4 0%,#e8f5e9 100%);border:1px solid #b2dfdb;border-radius:14px;padding:18px 24px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:14px;">
+        <div style="width:44px;height:44px;background:var(--teal);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">🔍</div>
+        <div>
+            <div style="font-size:14px;font-weight:700;color:var(--teal-deep);">Analisar edital com IA</div>
+            <div style="font-size:12px;color:var(--cinza);margin-top:2px;">Envie um PDF de edital e descubra sua compatibilidade + projetos sugeridos em segundos</div>
+        </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-shrink:0;">
+        <a href="{{ route('editais.analisar') }}" class="btn btn-primary" style="white-space:nowrap;">Analisar edital</a>
+        <a href="{{ route('documents.create') }}" class="btn btn-ghost" style="white-space:nowrap;">+ Novo documento</a>
+    </div>
+</div>
+
 {{-- Métricas rápidas --}}
 <div class="grid-4 mb-6">
     <div class="card" style="border-top:3px solid var(--azul);">
