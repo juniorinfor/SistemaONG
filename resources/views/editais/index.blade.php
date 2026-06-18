@@ -61,20 +61,32 @@
 .mini-bar    { flex: 1; max-width: 60px; height: 4px; background: #eee; border-radius: 4px; overflow: hidden; }
 .mini-bar-fill { height: 100%; border-radius: 4px; }
 .edital-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; flex-shrink: 0; }
-.filter-row {
-    display: flex; gap: 10px; flex-wrap: wrap;
-    margin-bottom: 20px; align-items: center;
-    max-width: 100%; overflow: hidden;
+.filter-box {
+    background: #fff; border: 1px solid var(--cinza-borda); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 20px;
 }
+.filter-row {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+}
+.filter-row + .filter-row { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--cinza-borda); }
 .filter-row input, .filter-row select {
     border: 1px solid var(--cinza-borda); border-radius: 8px;
-    padding: 8px 12px; font-size: 13px;
+    padding: 7px 11px; font-size: 13px;
     font-family: 'Roboto', sans-serif; background: #fff; color: var(--texto);
-    max-width: 100%;
 }
-.filter-row input { flex: 1; min-width: 160px; }
+.filter-row input[type="text"] { flex: 1; min-width: 180px; }
+.filter-row input[type="date"] { width: 148px; }
 .filter-row input:focus, .filter-row select:focus {
     outline: none; border-color: var(--teal);
+}
+.filter-label {
+    font-size: 11px; font-weight: 600; color: var(--cinza-light);
+    text-transform: uppercase; letter-spacing: .05em; white-space: nowrap;
+}
+.active-filters-count {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 700; background: var(--teal); color: #fff;
+    padding: 2px 8px; border-radius: 20px;
 }
 .sync-bar {
     display: flex; align-items: center; justify-content: space-between;
@@ -87,53 +99,104 @@
 
 @section('content')
 
+@php
+    $activeFilters = collect(['q','status','area','fonte','origem','prazo_de','prazo_ate','compat','ordenar'])
+        ->filter(fn($k) => request()->filled($k) && !(($k === 'status') && request('status') === 'abertos') && !(($k === 'ordenar') && request('ordenar') === 'recentes'))
+        ->count();
+@endphp
+
 <div class="sync-bar">
     <div>
-        <h1 style="font-size:20px;font-weight:700;color:var(--texto);margin:0;">Radar de Editais</h1>
+        <h1 style="font-size:20px;font-weight:700;color:var(--texto);margin:0;">
+            Radar de Editais
+            <span style="font-size:13px;font-weight:400;color:var(--cinza-light);margin-left:8px;">{{ $total }} cadastrados</span>
+        </h1>
         @if($lastSync)
-            <span class="sync-info">Última atualização: {{ \Carbon\Carbon::parse($lastSync)->format('d/m/Y H:i') }}</span>
+            <span class="sync-info">Última sincronização: {{ \Carbon\Carbon::parse($lastSync)->format('d/m/Y H:i') }}</span>
         @else
-            <span class="sync-info">Nunca sincronizado</span>
+            <span class="sync-info">Nenhuma sincronização automática ainda</span>
         @endif
     </div>
-    <div style="display:flex;gap:8px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <a href="{{ route('editais.create') }}" class="btn btn-ghost btn-sm">+ Cadastrar manualmente</a>
         <a href="{{ route('editais.analisar') }}" class="btn btn-ghost btn-sm">🔍 Analisar edital (IA)</a>
         <a href="{{ route('editais.sync') }}"
            onclick="this.innerHTML='Buscando...'; this.style.opacity='.7'; this.style.pointerEvents='none';"
-           class="btn btn-primary btn-sm">
-           ↻ Atualizar agora
-        </a>
+           class="btn btn-primary btn-sm">↻ Atualizar agora</a>
     </div>
 </div>
 
 {{-- Filtros --}}
-<form method="GET" action="{{ route('editais.index') }}" class="filter-row">
-    <input type="text" name="q" placeholder="Buscar por título..." value="{{ request('q') }}">
-    <select name="status">
-        <option value="">Abertos</option>
-        <option value="encerrados" {{ request('status') === 'encerrados' ? 'selected' : '' }}>Encerrados</option>
-    </select>
-    <select name="area">
-        <option value="">Todas as áreas</option>
-        @foreach($areas as $area)
-            <option value="{{ $area }}" {{ request('area') === $area ? 'selected' : '' }}>
-                {{ ucfirst($area) }}
-            </option>
-        @endforeach
-    </select>
-    <select name="fonte">
-        <option value="">Todas as fontes</option>
-        <option value="transferegov"  {{ request('fonte') === 'transferegov'  ? 'selected' : '' }}>Gov Federal</option>
-        <option value="iati"          {{ request('fonte') === 'iati'          ? 'selected' : '' }}>Internacional</option>
-        <option value="querido_diario"{{ request('fonte') === 'querido_diario'? 'selected' : '' }}>Diário Oficial</option>
-        <option value="dados_gov"     {{ request('fonte') === 'dados_gov'     ? 'selected' : '' }}>Dados.gov.br</option>
-        <option value="undp"          {{ request('fonte') === 'undp'          ? 'selected' : '' }}>UNDP / ONU</option>
-        <option value="eu_grants"     {{ request('fonte') === 'eu_grants'     ? 'selected' : '' }}>EU Grants</option>
-        <option value="manual"        {{ request('fonte') === 'manual'        ? 'selected' : '' }}>Manual</option>
-    </select>
-    <button class="btn btn-ghost btn-sm" type="submit">Filtrar</button>
-    <a href="{{ route('editais.index') }}" class="btn btn-ghost btn-sm">Limpar</a>
+<form method="GET" action="{{ route('editais.index') }}" class="filter-box">
+
+    {{-- Linha 1: busca + status + área + botões --}}
+    <div class="filter-row">
+        <input type="text" name="q" placeholder="Buscar por título..." value="{{ request('q') }}">
+
+        <select name="status">
+            <option value="abertos" {{ request('status','abertos') === 'abertos' ? 'selected' : '' }}>Abertos</option>
+            <option value="encerrados" {{ request('status') === 'encerrados' ? 'selected' : '' }}>Encerrados</option>
+            <option value="todos" {{ request('status') === 'todos' ? 'selected' : '' }}>Todos</option>
+        </select>
+
+        <select name="area">
+            <option value="">Todas as áreas</option>
+            @foreach($areas as $area)
+                <option value="{{ $area }}" {{ request('area') === $area ? 'selected' : '' }}>{{ ucfirst($area) }}</option>
+            @endforeach
+        </select>
+
+        <select name="ordenar">
+            <option value="recentes" {{ request('ordenar','recentes') === 'recentes' ? 'selected' : '' }}>Mais recentes primeiro</option>
+            <option value="prazo"    {{ request('ordenar') === 'prazo'    ? 'selected' : '' }}>Prazo de inscrição</option>
+            <option value="compat"   {{ request('ordenar') === 'compat'   ? 'selected' : '' }}>Compatibilidade</option>
+        </select>
+
+        <button class="btn btn-primary btn-sm" type="submit">
+            Filtrar
+            @if($activeFilters > 0)
+                <span class="active-filters-count">{{ $activeFilters }}</span>
+            @endif
+        </button>
+        <a href="{{ route('editais.index') }}" class="btn btn-ghost btn-sm">Limpar</a>
+    </div>
+
+    {{-- Linha 2: filtros avançados --}}
+    <div class="filter-row">
+        <span class="filter-label">Prazo de inscrição:</span>
+        <input type="date" name="prazo_de"  value="{{ request('prazo_de') }}"  title="A partir de">
+        <span style="font-size:12px;color:var(--cinza-light);">até</span>
+        <input type="date" name="prazo_ate" value="{{ request('prazo_ate') }}" title="Até">
+
+        <span class="filter-label" style="margin-left:8px;">Origem:</span>
+        <select name="origem">
+            <option value="">Qualquer origem</option>
+            <option value="manual"    {{ request('origem') === 'manual'    ? 'selected' : '' }}>Inseridos manualmente / IA</option>
+            <option value="automatico"{{ request('origem') === 'automatico'? 'selected' : '' }}>Importados automaticamente</option>
+        </select>
+
+        <span class="filter-label" style="margin-left:8px;">Fonte:</span>
+        <select name="fonte">
+            <option value="">Todas</option>
+            <option value="upload"       {{ request('fonte') === 'upload'        ? 'selected' : '' }}>Análise por IA</option>
+            <option value="manual"       {{ request('fonte') === 'manual'        ? 'selected' : '' }}>Manual</option>
+            <option value="transferegov" {{ request('fonte') === 'transferegov'  ? 'selected' : '' }}>Gov Federal</option>
+            <option value="iati"         {{ request('fonte') === 'iati'          ? 'selected' : '' }}>Internacional</option>
+            <option value="querido_diario"{{ request('fonte') === 'querido_diario'? 'selected' : '' }}>Diário Oficial</option>
+            <option value="dados_gov"    {{ request('fonte') === 'dados_gov'     ? 'selected' : '' }}>Dados.gov.br</option>
+            <option value="undp"         {{ request('fonte') === 'undp'          ? 'selected' : '' }}>UNDP / ONU</option>
+            <option value="eu_grants"    {{ request('fonte') === 'eu_grants'     ? 'selected' : '' }}>EU Grants</option>
+        </select>
+
+        <span class="filter-label" style="margin-left:8px;">Compatib. mín.:</span>
+        <select name="compat">
+            <option value="">Qualquer</option>
+            <option value="40" {{ request('compat') === '40' ? 'selected' : '' }}>≥ 40%</option>
+            <option value="60" {{ request('compat') === '60' ? 'selected' : '' }}>≥ 60%</option>
+            <option value="80" {{ request('compat') === '80' ? 'selected' : '' }}>≥ 80%</option>
+        </select>
+    </div>
+
 </form>
 
 @if(session('success'))
@@ -201,6 +264,9 @@
                     <span class="compat-pct {{ $cls }}">{{ $score }}% compat.</span>
                 </div>
             @endif
+            <span style="font-size:11px;color:var(--cinza-light);margin-left:auto;">
+                Adicionado {{ $edital->created_at->diffForHumans() }}
+            </span>
         </div>
     </div>
 

@@ -32,38 +32,66 @@ class EditalController extends Controller
         $institution = $this->institution();
 
         $query = Edital::where('institution_id', $institution->id)
-            ->with('attachments')
-            ->orderByRaw("CASE WHEN prazo_inscricao IS NULL THEN 1 ELSE 0 END")
-            ->orderBy('prazo_inscricao');
+            ->with('attachments');
 
-        if ($request->filled('status')) {
-            if ($request->status === 'abertos') {
-                $query->abertos();
-            } elseif ($request->status === 'encerrados') {
-                $query->where(fn($q) => $q->where('status', 'encerrado')
-                    ->orWhere('prazo_inscricao', '<', now()->toDateString()));
-            }
-        } else {
+        // ── Status ──────────────────────────────────────────────────
+        $status = $request->input('status', 'abertos');
+        if ($status === 'abertos') {
             $query->abertos();
+        } elseif ($status === 'encerrados') {
+            $query->where(fn($q) => $q->where('status', 'encerrado')
+                ->orWhere('prazo_inscricao', '<', now()->toDateString()));
         }
+        // 'todos' → sem filtro de status
 
+        // ── Área ────────────────────────────────────────────────────
         if ($request->filled('area')) {
             $query->where('area', $request->area);
         }
 
+        // ── Fonte / Origem ──────────────────────────────────────────
         if ($request->filled('fonte')) {
             $query->where('fonte', $request->fonte);
+        } elseif ($request->filled('origem')) {
+            if ($request->origem === 'manual') {
+                $query->whereIn('fonte', ['manual', 'upload']);
+            } elseif ($request->origem === 'automatico') {
+                $query->whereNotIn('fonte', ['manual', 'upload']);
+            }
         }
 
+        // ── Prazo de inscrição (intervalo) ──────────────────────────
+        if ($request->filled('prazo_de')) {
+            $query->where('prazo_inscricao', '>=', $request->prazo_de);
+        }
+        if ($request->filled('prazo_ate')) {
+            $query->where('prazo_inscricao', '<=', $request->prazo_ate);
+        }
+
+        // ── Compatibilidade mínima ───────────────────────────────────
+        if ($request->filled('compat') && is_numeric($request->compat)) {
+            $query->where('compatibility_score', '>=', (int) $request->compat);
+        }
+
+        // ── Busca por título ─────────────────────────────────────────
         if ($request->filled('q')) {
             $query->where('titulo', 'like', '%' . $request->q . '%');
         }
 
-        $editais = $query->paginate(15)->withQueryString();
-        $areas   = Edital::where('institution_id', $institution->id)->distinct()->pluck('area')->filter()->sort();
-        $lastSync = Edital::where('institution_id', $institution->id)->max('synced_at');
+        // ── Ordenação ────────────────────────────────────────────────
+        match ($request->input('ordenar', 'recentes')) {
+            'prazo'  => $query->orderByRaw("CASE WHEN prazo_inscricao IS NULL THEN 1 ELSE 0 END")
+                              ->orderBy('prazo_inscricao'),
+            'compat' => $query->orderByDesc('compatibility_score'),
+            default  => $query->orderByDesc('created_at'),
+        };
 
-        return view('editais.index', compact('editais', 'areas', 'lastSync'));
+        $editais  = $query->paginate(15)->withQueryString();
+        $areas    = Edital::where('institution_id', $institution->id)->distinct()->pluck('area')->filter()->sort();
+        $lastSync = Edital::where('institution_id', $institution->id)->max('synced_at');
+        $total    = Edital::where('institution_id', $institution->id)->count();
+
+        return view('editais.index', compact('editais', 'areas', 'lastSync', 'total'));
     }
 
     // ---------------------------------------------------------------
