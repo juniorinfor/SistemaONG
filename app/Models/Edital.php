@@ -16,7 +16,7 @@ class Edital extends Model
 
     protected $fillable = [
         'institution_id', 'titulo', 'area', 'fonte', 'fonte_id',
-        'link_oficial', 'valor_min', 'valor_max', 'prazo_inscricao',
+        'link_oficial', 'link_submissao', 'valor_min', 'valor_max', 'prazo_inscricao',
         'prazo_execucao', 'resumo', 'criterios', 'raw_text',
         'compatibility_score', 'compatibility_details', 'status', 'synced_at',
         'project_suggestions', 'suggestions_at',

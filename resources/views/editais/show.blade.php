@@ -62,7 +62,13 @@
             <span style="font-size:12px;padding:2px 10px;border-radius:20px;background:#f3e5f5;color:#6a1b9a;">{{ $fonteLabel }}</span>
         </div>
     </div>
-    <div style="display:flex;gap:8px;flex-shrink:0;">
+    <div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;">
+        @if($edital->link_submissao)
+            <a href="{{ $edital->link_submissao }}" target="_blank" class="btn btn-primary btn-sm"
+               style="background:#1565c0;border-color:#1565c0;">
+                📤 Enviar proposta
+            </a>
+        @endif
         @if($edital->link_oficial)
             <a href="{{ $edital->link_oficial }}" target="_blank" class="btn btn-ghost btn-sm">↗ Site oficial</a>
         @endif
@@ -323,6 +329,39 @@
             </div>
         </div>
 
+        {{-- Enviar proposta --}}
+        <div class="card" style="margin-bottom:16px;">
+            <div class="card-header"><span class="card-title">Envio de proposta</span></div>
+            <div class="card-body">
+                @if($edital->link_submissao)
+                    <a href="{{ $edital->link_submissao }}" target="_blank"
+                       class="btn btn-primary btn-sm" style="width:100%;text-align:center;background:#1565c0;border-color:#1565c0;display:block;margin-bottom:10px;">
+                        📤 Acessar plataforma de envio
+                    </a>
+                    <p style="font-size:11px;color:var(--cinza-light);text-align:center;margin:0;">
+                        Link extraído automaticamente do edital pela IA
+                    </p>
+                @else
+                    <p style="font-size:12.5px;color:var(--cinza-light);margin-bottom:10px;">
+                        Nenhum link de envio identificado no edital.<br>
+                        Adicione manualmente se encontrar no edital.
+                    </p>
+                @endif
+
+                {{-- Campo para editar/adicionar o link manualmente --}}
+                <form method="POST" action="{{ route('editais.update-submissao', $edital) }}" style="margin-top:10px;">
+                    @csrf @method('PATCH')
+                    <div style="display:flex;gap:6px;">
+                        <input type="url" name="link_submissao"
+                               value="{{ $edital->link_submissao }}"
+                               placeholder="https://plataforma-do-edital.gov.br/..."
+                               style="flex:1;font-size:12px;padding:7px 10px;border:1px solid var(--cinza-borda);border-radius:8px;font-family:'Roboto',sans-serif;color:var(--texto);">
+                        <button type="submit" class="btn btn-ghost btn-sm" style="white-space:nowrap;">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         {{-- Ação rápida: ver checklist de docs --}}
         <div class="card">
             <div class="card-header"><span class="card-title">Ações rápidas</span></div>
@@ -334,7 +373,7 @@
                     ✔ Ver checklists de prontidão
                 </a>
                 @if($edital->link_oficial)
-                    <a href="{{ $edital->link_oficial }}" target="_blank" class="btn btn-primary btn-sm" style="text-align:center;">
+                    <a href="{{ $edital->link_oficial }}" target="_blank" class="btn btn-ghost btn-sm" style="text-align:center;">
                         ↗ Acessar edital completo
                     </a>
                 @endif

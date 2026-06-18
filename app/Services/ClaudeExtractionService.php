@@ -74,7 +74,8 @@ Formato esperado:
   "prazo_inscricao": "YYYY-MM-DD" ou null,
   "prazo_execucao": "YYYY-MM-DD" ou null,
   "resumo": "string — resumo em português de até 400 caracteres",
-  "criterios": "string — lista dos requisitos/documentos exigidos para habilitação, um por linha separados por \\n"
+  "criterios": "string — lista dos requisitos/documentos exigidos para habilitação, um por linha separados por \\n",
+  "link_submissao": "string — URL completa para envio/inscrição da proposta (sistema de inscrição, formulário online, plataforma), ou null se não houver"
 }
 PROMPT;
 

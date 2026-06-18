@@ -247,6 +247,8 @@ class EditalController extends Controller
         // 2. Cria o edital com os dados extraídos
         $sanitizarData = fn($d) => (is_string($d) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) ? $d : null;
 
+        $sanitizarUrl = fn($u) => (is_string($u) && filter_var($u, FILTER_VALIDATE_URL)) ? $u : null;
+
         $edital = Edital::create([
             'institution_id'  => $institution->id,
             'titulo'          => $dados['titulo'] ?? $file->getClientOriginalName(),
@@ -258,6 +260,7 @@ class EditalController extends Controller
             'prazo_execucao'  => $sanitizarData($dados['prazo_execucao'] ?? null),
             'resumo'          => $dados['resumo'] ?? null,
             'criterios'       => $dados['criterios'] ?? null,
+            'link_submissao'  => $sanitizarUrl($dados['link_submissao'] ?? null),
             'status'          => 'aberto',
             'synced_at'       => now(),
         ]);
@@ -415,6 +418,22 @@ class EditalController extends Controller
 
         return redirect()->route('projects.show', $project)
             ->with('success', 'Projeto gerado pela IA e vinculado ao edital. Revise e ajuste antes de submeter.');
+    }
+
+    // ---------------------------------------------------------------
+    // Atualizar link de submissão manualmente
+    // ---------------------------------------------------------------
+    public function updateSubmissao(Request $request, Edital $edital)
+    {
+        $request->validate([
+            'link_submissao' => 'nullable|url|max:1000',
+        ], [
+            'link_submissao.url' => 'Informe uma URL válida (começando com https://).',
+        ]);
+
+        $edital->update(['link_submissao' => $request->input('link_submissao') ?: null]);
+
+        return back()->with('success', 'Link de envio de proposta atualizado.');
     }
 
     // ---------------------------------------------------------------
