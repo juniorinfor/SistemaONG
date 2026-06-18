@@ -145,13 +145,19 @@
                 @if(!empty($sugestoes))
                     @foreach($sugestoes as $i => $s)
                     @php
-                        $ad = (int) ($s['aderencia'] ?? 0);
-                        $cor = $ad >= 70 ? '#00897b' : ($ad >= 40 ? '#e65100' : '#c62828');
+                        $ad     = (int) ($s['aderencia'] ?? 0);
+                        $cor    = $ad >= 70 ? '#00897b' : ($ad >= 40 ? '#e65100' : '#c62828');
+                        $isNovo = ($s['tipo'] ?? '') === 'novo' || empty($s['project_id']);
                     @endphp
                     <div style="padding:14px 0;{{ $i > 0 ? 'border-top:1px solid var(--cinza-borda);' : '' }}">
-                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-                            <span style="font-size:18px;">{{ $i === 0 ? '🎯' : '•' }}</span>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                            <span style="font-size:16px;">{{ $i === 0 ? '🎯' : ($isNovo ? '💡' : '•') }}</span>
                             <span style="font-size:14px;font-weight:600;color:var(--texto);flex:1;">{{ $s['titulo'] ?? 'Projeto' }}</span>
+                            @if($isNovo)
+                                <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#fff8e1;color:#f57f17;border:1px solid #ffe082;white-space:nowrap;">Ideia nova</span>
+                            @else
+                                <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;white-space:nowrap;">Portfólio</span>
+                            @endif
                             <span style="font-size:13px;font-weight:700;color:{{ $cor }};">{{ $ad }}%</span>
                         </div>
                         <div style="height:5px;background:#eee;border-radius:4px;overflow:hidden;margin-bottom:8px;">
@@ -160,21 +166,27 @@
                         @if(!empty($s['justificativa']))
                             <p style="font-size:12.5px;color:var(--texto);line-height:1.5;margin-bottom:4px;">{{ $s['justificativa'] }}</p>
                         @endif
-                        @if(!empty($s['ajustes']))
+                        @if($isNovo && !empty($s['descricao']))
+                            <p style="font-size:12px;color:var(--cinza);line-height:1.5;margin-bottom:6px;font-style:italic;">{{ $s['descricao'] }}</p>
+                        @endif
+                        @if(!$isNovo && !empty($s['ajustes']))
                             <p style="font-size:12px;color:var(--cinza-light);line-height:1.5;margin-bottom:8px;">
                                 <strong>Ajustar:</strong> {{ $s['ajustes'] }}
                             </p>
                         @endif
                         <div style="display:flex;gap:6px;align-items:center;">
-                            @if(!empty($s['project_id']))
+                            @if(!$isNovo && !empty($s['project_id']))
                                 <a href="{{ route('projects.show', $s['project_id']) }}" class="btn btn-ghost btn-sm" style="font-size:11px;">Ver base</a>
                             @endif
                             <form method="POST" action="{{ route('editais.gerar-projeto', $edital) }}" style="display:inline;">
                                 @csrf
-                                <input type="hidden" name="project_id" value="{{ $s['project_id'] ?? '' }}">
+                                <input type="hidden" name="project_id"      value="{{ $s['project_id'] ?? '' }}">
+                                <input type="hidden" name="titulo_base"     value="{{ $s['titulo'] ?? '' }}">
+                                <input type="hidden" name="area_base"       value="{{ $s['area'] ?? '' }}">
+                                <input type="hidden" name="descricao_base"  value="{{ $s['descricao'] ?? '' }}">
                                 <button type="submit" class="btn btn-primary btn-sm" style="font-size:11px;"
                                         onclick="this.innerHTML='⏳ Gerando projeto...';this.form.style.pointerEvents='none';">
-                                    ✨ Gerar projeto com IA
+                                    {{ $isNovo ? '✨ Gerar e incluir no portfólio' : '✨ Gerar projeto com IA' }}
                                 </button>
                             </form>
                         </div>

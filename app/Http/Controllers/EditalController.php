@@ -351,9 +351,9 @@ class EditalController extends Controller
         }
 
         $projetoBase = [
-            'titulo'    => $base->title ?? ($edital->titulo . ' — projeto'),
-            'area'      => $base->area ?? $edital->area,
-            'descricao' => $base->description ?? '',
+            'titulo'    => $base->title    ?? $request->input('titulo_base', $edital->titulo . ' — projeto'),
+            'area'      => $base->area     ?? $request->input('area_base', $edital->area),
+            'descricao' => $base->description ?? $request->input('descricao_base', ''),
         ];
 
         $dados = $this->claude->gerarProjeto([

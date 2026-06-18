@@ -150,23 +150,41 @@ EDITAL EM ANÁLISE:
 PORTFÓLIO DE PROJETOS DA ONG (já cadastrados):
 {$portfolio}
 
-Selecione os 3 projetos do portfólio MAIS ADERENTES a este edital e ranqueie do mais ao menos aderente.
-Para cada um, avalie a aderência (0-100), explique por que combina e o que ajustar para encaixar no edital.
+Retorne exatamente 3 sugestões:
+1. O projeto do portfólio MAIS ADERENTE ao edital (tipo "portfolio").
+2. Duas ideias de PROJETOS NOVOS que a ONG poderia criar para este edital, com base no perfil da ONG deduzido do portfólio (tipo "novo"). Invente títulos e conceitos originais que se encaixem nas exigências do edital — não repita projetos do portfólio.
+
+Para projetos do portfólio: inclua o project_id real e o que ajustar.
+Para projetos novos: project_id deve ser null; descricao deve ter 2–3 frases resumindo o conceito.
+
 Responda APENAS com JSON válido, sem markdown:
 {
   "sugestoes": [
     {
-      "project_id": número (ID do projeto do portfólio),
-      "titulo": "string — título do projeto",
+      "tipo": "portfolio",
+      "project_id": número,
+      "titulo": "string",
+      "area": "string",
       "aderencia": número de 0 a 100,
-      "justificativa": "string curta — por que esse projeto combina com o edital",
-      "ajustes": "string curta — o que adaptar para encaixar nas exigências do edital"
+      "justificativa": "string curta",
+      "ajustes": "string curta — o que adaptar",
+      "descricao": ""
+    },
+    {
+      "tipo": "novo",
+      "project_id": null,
+      "titulo": "string — título original do projeto novo",
+      "area": "string — área temática",
+      "aderencia": número de 0 a 100,
+      "justificativa": "string curta — por que esta ideia se encaixa no edital",
+      "ajustes": "",
+      "descricao": "string — resumo de 2 a 3 frases do conceito do projeto novo"
     }
   ]
 }
 PROMPT;
 
-        return $this->call($prompt);
+        return $this->callWithContent($prompt, 1800, 60);
     }
 
     /**
