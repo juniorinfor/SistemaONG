@@ -10,6 +10,8 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\TransparencyController;
 use App\Http\Controllers\EditalController;
+use App\Http\Controllers\BeneficiarioController;
+use App\Http\Controllers\AcaoController;
 use Illuminate\Support\Facades\Route;
 
 // Raiz → login ou dashboard
@@ -50,6 +52,16 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('editais', EditalController::class)
         ->only(['index','show','create','store','destroy'])
         ->parameters(['editais' => 'edital']);
+
+    // Beneficiários
+    Route::resource('beneficiarios', BeneficiarioController::class);
+
+    // Ações + Sessões
+    Route::resource('acoes', AcaoController::class);
+    Route::get('/acoes/{acao}/relatorio', [AcaoController::class, 'relatorio'])->name('acoes.relatorio');
+    Route::post('/acoes/{acao}/sessoes', [AcaoController::class, 'storeSessao'])->name('acoes.sessao.store');
+    Route::get('/acoes/{acao}/sessoes/{sessao}', [AcaoController::class, 'showSessao'])->name('acoes.sessao.show');
+    Route::post('/acoes/{acao}/sessoes/{sessao}/presenca', [AcaoController::class, 'storePresenca'])->name('acoes.sessao.presenca');
 
     // Perfil Breeze
     Route::get('/profile',    [ProfileController::class, 'edit'])->name('profile.edit');
