@@ -12,6 +12,7 @@ use App\Http\Controllers\TransparencyController;
 use App\Http\Controllers\EditalController;
 use App\Http\Controllers\BeneficiarioController;
 use App\Http\Controllers\AcaoController;
+use App\Http\Controllers\CadastroPublicoController;
 use Illuminate\Support\Facades\Route;
 
 // Raiz → login ou dashboard
@@ -70,6 +71,9 @@ Route::middleware(['auth'])->group(function () {
 });
 
 // Portal público (sem login)
+Route::get('/cadastro',  [CadastroPublicoController::class, 'show'])->name('cadastro.show');
+Route::post('/cadastro', [CadastroPublicoController::class, 'store'])->name('cadastro.store');
+
 Route::get('/transparencia',          [TransparencyController::class, 'index'])->name('transparency.index');
 Route::get('/transparencia/documento/{document}/download',
     [TransparencyController::class, 'download'])->name('transparency.download');
